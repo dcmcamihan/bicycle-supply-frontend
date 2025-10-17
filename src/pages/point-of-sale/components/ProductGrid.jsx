@@ -42,14 +42,14 @@ const ProductGrid = ({ products, onAddToCart }) => {
                 />
               </div>
               <div className="space-y-2 flex flex-col flex-1">
-                <h4 className="font-body font-medium text-xs text-foreground line-clamp-2">
+                <h4 className="font-body font-medium text-xs text-foreground line-clamp-2" style={{ minHeight: '2.5em', maxHeight: '2.5em', overflow: 'hidden' }}>
                   {product?.name}
                 </h4>
-                <div className="flex items-center justify-between">
-                  <span className="font-heading font-bold text-[14px] text-primary">
+                <div className="flex items-center justify-between gap-1">
+                  <span className="font-heading font-bold text-[14px] text-primary pr-1">
                     {formatPrice(product?.price)}
                   </span>
-                  <span className={`font-caption text-[7px] ${stockStatus?.color}`}>
+                  <span className={`font-caption text-[7px] ${stockStatus?.color} pl-1`}>
                     {stockStatus?.text}
                   </span>
                 </div>

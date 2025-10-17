@@ -89,7 +89,11 @@ const PointOfSale = () => {
 
   // Filter products based on search and category
   const filteredProducts = products?.filter(product => {
-    const matchesSearch = product?.name?.toLowerCase()?.includes(searchTerm?.toLowerCase());
+    const matchesSearch = (
+      product?.name?.toLowerCase()?.includes(searchTerm?.toLowerCase()) ||
+      product?.sku?.toLowerCase()?.includes(searchTerm?.toLowerCase()) ||
+      product?.id?.toString()?.includes(searchTerm)
+    );
     const matchesCategory = activeCategory === 'all' || product?.category === activeCategory;
     return matchesSearch && matchesCategory;
   });
