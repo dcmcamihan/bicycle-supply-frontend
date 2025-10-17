@@ -21,81 +21,54 @@ const PointOfSale = () => {
   const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
   const [lastTransaction, setLastTransaction] = useState(null);
 
-  // Mock product data
-  const mockProducts = [
-    {
-      id: 1,
-      name: "Trek Domane AL 2 Road Bike",
-      sku: "TRK-DOM-AL2-BLK",
-      price: 899.99,
-      stock: 5,
-      category: "road",
-      image: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=400&fit=crop"
-    },
-    {
-      id: 2,
-      name: "Specialized Rockhopper 29",
-      sku: "SPZ-RCK-29-RED",
-      price: 650.00,
-      stock: 8,
-      category: "mountain",
-      image: "https://images.unsplash.com/photo-1544191696-15693072b5a5?w=400&h=400&fit=crop"
-    },
-    {
-      id: 3,
-      name: "Giant Escape 3 Hybrid",
-      sku: "GNT-ESC-3-BLU",
-      price: 480.00,
-      stock: 12,
-      category: "hybrid",
-      image: "https://images.unsplash.com/photo-1571068316344-75bc76f77890?w=400&h=400&fit=crop"
-    },
-    {
-      id: 4,
-      name: "Cannondale Quick CX 3",
-      sku: "CND-QCX-3-GRY",
-      price: 750.00,
-      stock: 3,
-      category: "hybrid",
-      image: "https://images.unsplash.com/photo-1502744688674-c619d1586c9e?w=400&h=400&fit=crop"
-    },
-    {
-      id: 5,
-      name: "Scott Scale 970",
-      sku: "SCT-SCL-970-GRN",
-      price: 1299.99,
-      stock: 2,
-      category: "mountain",
-      image: "https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?w=400&h=400&fit=crop"
-    },
-    {
-      id: 6,
-      name: "Bianchi Via Nirone 7",
-      sku: "BNC-VN7-WHT",
-      price: 1150.00,
-      stock: 0,
-      category: "road",
-      image: "https://images.unsplash.com/photo-1571068316344-75bc76f77890?w=400&h=400&fit=crop"
-    },
-    {
-      id: 7,
-      name: "Helmet - Giro Register",
-      sku: "GRO-REG-BLK-M",
-      price: 45.00,
-      stock: 25,
-      category: "accessories",
-      image: "https://images.unsplash.com/photo-1544966503-7cc5ac882d5f?w=400&h=400&fit=crop"
-    },
-    {
-      id: 8,
-      name: "Water Bottle - Specialized",
-      sku: "SPZ-WB-BLU",
-      price: 12.99,
-      stock: 50,
-      category: "accessories",
-      image: "https://images.unsplash.com/photo-1523362628745-0c100150b504?w=400&h=400&fit=crop"
-    }
-  ];
+  // Products fetched from API
+  const [products, setProducts] = useState([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
+  const [productsError, setProductsError] = useState(null);
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setLoadingProducts(true);
+        const response = await fetch('http://localhost:3000/api/products');
+        if (!response.ok) throw new Error('Failed to fetch products');
+        const data = await response.json();
+        // Map API data to expected format for POS
+        const mappedProducts = await Promise.all(
+          data.map(async item => {
+            let stock = 0;
+            try {
+              const stockRes = await fetch(`http://localhost:3000/api/products/${item.product_id}/quantity-on-hand`);
+              if (stockRes.ok) {
+                stock = await stockRes.json();
+              }
+            } catch (err) {
+              stock = 0;
+            }
+            // Ensure stock is never less than 0
+            stock = stock < 0 ? 0 : stock;
+            return {
+              id: item.product_id,
+              name: item.product_name,
+              price: parseFloat(item.price),
+              category: item.category_code,
+              brand_id: item.brand_id,
+              image: 'https://images.unsplash.com/photo-1519125323398-675f0ddb6308?w=400&h=400&fit=crop',
+              stock
+            };
+          })
+        );
+        setProducts(mappedProducts);
+        setProductsError(null);
+      } catch (error) {
+        setProductsError(error.message);
+        setProducts([]);
+      } finally {
+        setLoadingProducts(false);
+      }
+    };
+    fetchProducts();
+  }, []);
 
   const [categories, setCategories] = useState([]);
 
@@ -115,9 +88,8 @@ const PointOfSale = () => {
   }, []);
 
   // Filter products based on search and category
-  const filteredProducts = mockProducts?.filter(product => {
-    const matchesSearch = product?.name?.toLowerCase()?.includes(searchTerm?.toLowerCase()) ||
-                         product?.sku?.toLowerCase()?.includes(searchTerm?.toLowerCase());
+  const filteredProducts = products?.filter(product => {
+    const matchesSearch = product?.name?.toLowerCase()?.includes(searchTerm?.toLowerCase());
     const matchesCategory = activeCategory === 'all' || product?.category === activeCategory;
     return matchesSearch && matchesCategory;
   });
@@ -130,9 +102,8 @@ const PointOfSale = () => {
 
   const handleAddToCart = (product) => {
     const existingItem = cartItems?.find(item => item?.id === product?.id);
-    
     if (existingItem) {
-      if (existingItem?.quantity < product?.stock) {
+      if (existingItem?.quantity < (product?.stock ?? 10)) {
         setCartItems(cartItems?.map(item =>
           item?.id === product?.id
             ? { ...item, quantity: item?.quantity + 1 }
@@ -142,7 +113,7 @@ const PointOfSale = () => {
         alert('Not enough stock available');
       }
     } else {
-      if (product?.stock > 0) {
+      if ((product?.stock ?? 10) > 0) {
         setCartItems([...cartItems, { ...product, quantity: 1 }]);
       } else {
         alert('Product is out of stock');
@@ -151,8 +122,8 @@ const PointOfSale = () => {
   };
 
   const handleUpdateQuantity = (productId, newQuantity) => {
-    const product = mockProducts?.find(p => p?.id === productId);
-    if (newQuantity <= product?.stock) {
+    const product = products?.find(p => p?.id === productId);
+    if (newQuantity <= (product?.stock ?? 10)) {
       setCartItems(cartItems?.map(item =>
         item?.id === productId
           ? { ...item, quantity: newQuantity }

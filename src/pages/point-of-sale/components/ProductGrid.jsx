@@ -12,8 +12,8 @@ const ProductGrid = ({ products, onAddToCart }) => {
   };
 
   const getStockStatus = (stock) => {
-    if (stock === 0) return { text: 'Out of Stock', color: 'text-destructive' };
-    if (stock <= 5) return { text: 'Low Stock', color: 'text-warning' };
+    if (stock <= 0) return { text: 'Out of Stock', color: 'text-destructive' };
+    if (stock <= 3) return { text: 'Low Stock', color: 'text-warning' };
     return { text: 'In Stock', color: 'text-success' };
   };
 
@@ -32,7 +32,7 @@ const ProductGrid = ({ products, onAddToCart }) => {
           return (
             <div
               key={product?.id}
-              className="bg-muted border border-border rounded-lg p-3 hover:shadow-raised transition-smooth"
+              className="bg-muted border border-border rounded-lg p-3 hover:shadow-raised transition-smooth flex flex-col h-full"
             >
               <div className="aspect-square mb-3 overflow-hidden rounded-md bg-background">
                 <Image
@@ -41,25 +41,23 @@ const ProductGrid = ({ products, onAddToCart }) => {
                   className="w-full h-full object-cover"
                 />
               </div>
-              <div className="space-y-2">
-                <h4 className="font-body font-medium text-sm text-foreground line-clamp-2">
+              <div className="space-y-2 flex flex-col flex-1">
+                <h4 className="font-body font-medium text-xs text-foreground line-clamp-2">
                   {product?.name}
                 </h4>
-                
                 <div className="flex items-center justify-between">
-                  <span className="font-heading font-bold text-lg text-primary">
+                  <span className="font-heading font-bold text-[14px] text-primary">
                     {formatPrice(product?.price)}
                   </span>
-                  <span className={`font-caption text-xs ${stockStatus?.color}`}>
+                  <span className={`font-caption text-[7px] ${stockStatus?.color}`}>
                     {stockStatus?.text}
                   </span>
                 </div>
-                
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>SKU: {product?.sku}</span>
+                  <span>SKU: {product?.id}</span>
                   <span>Stock: {product?.stock}</span>
                 </div>
-                
+                <div className="flex-1" />
                 <Button
                   variant="default"
                   size="sm"
