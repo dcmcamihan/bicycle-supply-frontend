@@ -101,14 +101,94 @@ const SalesReports = () => {
               customerName = `Customer #${item.customer_id}`;
             }
           }
+
+          // Fetch sale details and sum quantity_sold for items
+          let itemsCount = 0;
+          let totalAmount = 0;
+          try {
+            const detailsRes = await fetch(`http://localhost:3000/api/sale-details/sale/${item.sale_id}`);
+            if (detailsRes.ok) {
+              const detailsData = await detailsRes.json();
+              itemsCount = detailsData.reduce((sum, detail) => sum + (detail.quantity_sold || 0), 0);
+
+              // Fetch product prices and compute total amount
+              for (const detail of detailsData) {
+                try {
+                  const prodRes = await fetch(`http://localhost:3000/api/products/${detail.product_id}`);
+                  if (prodRes.ok) {
+                    const prodData = await prodRes.json();
+                    const price = parseFloat(prodData.price) || 0;
+                    totalAmount += price * (detail.quantity_sold || 0);
+                  }
+                } catch (err) {
+                  // If product fetch fails, skip
+                }
+              }
+            }
+          } catch (err) {
+            itemsCount = 0;
+            totalAmount = 0;
+          }
+
+          // Fetch payment method description
+          let paymentMethod = '';
+          try {
+            const payRes = await fetch(`http://localhost:3000/api/sale-payment-types/sale/${item.sale_id}`);
+            if (payRes.ok) {
+              const payData = await payRes.json();
+              let payment_method_code = '';
+              if (Array.isArray(payData) && payData.length > 0) {
+                payment_method_code = payData[0].payment_method_code || '';
+              } else if (payData.payment_method_code) {
+                payment_method_code = payData.payment_method_code;
+              }
+              if (payment_method_code) {
+                try {
+                  const descRes = await fetch(`http://localhost:3000/api/payment-methods/${payment_method_code}`);
+                  if (descRes.ok) {
+                    const descData = await descRes.json();
+                    paymentMethod = descData.description || payment_method_code;
+                  } else {
+                    paymentMethod = payment_method_code;
+                  }
+                } catch (err) {
+                  paymentMethod = payment_method_code;
+                }
+              }
+            }
+          } catch (err) {
+            paymentMethod = '';
+          }
+
+          // Fetch staff (cashier) full name
+          let staffName = '';
+          if (item.cashier) {
+            try {
+              const staffRes = await fetch(`http://localhost:3000/api/employees/${item.cashier}`);
+              if (staffRes.ok) {
+                const staffData = await staffRes.json();
+                let middleInitial = '';
+                if (staffData.middle_name) {
+                  middleInitial = staffData.middle_name.trim().length > 0 ? staffData.middle_name.trim()[0].toUpperCase() + '. ' : '';
+                }
+                staffName = `${staffData.first_name} ${middleInitial}${staffData.last_name}`;
+              } else {
+                staffName = `Employee #${item.cashier}`;
+              }
+            } catch (err) {
+              staffName = `Employee #${item.cashier}`;
+            }
+          }
+
           return {
             id: item.sale_id,
             date: item.sale_date ? new Date(item.sale_date).toISOString().split('T')[0] : '',
             customer: customerName,
-            amount: item.amount ?? 0,
-            items: item.items ?? 1,
+            amount: totalAmount,
+            items: itemsCount,
+            paymentMethod,
             status: item.status ?? 'completed',
-            cashier: item.cashier,
+            staff: staffName,
             manager: item.manager
           };
         }));
