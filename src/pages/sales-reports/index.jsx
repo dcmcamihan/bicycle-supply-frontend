@@ -74,12 +74,55 @@ const SalesReports = () => {
     { name: 'Accessories', value: 15800, percentage: 12.3, color: '#27AE60' }
   ];
 
-  // Mock transactions data
-  const transactionsData = [
-    { id: 1, date: '2024-01-15', customer: 'John Doe', amount: 450.50, items: 2, status: 'completed' },
-    { id: 2, date: '2024-01-15', customer: 'Jane Smith', amount: 320.00, items: 1, status: 'completed' },
-    { id: 3, date: '2024-01-14', customer: 'Mike Johnson', amount: 875.25, items: 3, status: 'pending' }
-  ];
+  // Transactions data from API
+  const [transactionsData, setTransactionsData] = useState([]);
+  const [loadingTransactions, setLoadingTransactions] = useState(true);
+  const [transactionsError, setTransactionsError] = useState(null);
+
+  useEffect(() => {
+    const fetchTransactions = async () => {
+      try {
+        setLoadingTransactions(true);
+        const response = await fetch('http://localhost:3000/api/sales');
+        if (!response.ok) throw new Error('Failed to fetch transactions');
+        const data = await response.json();
+
+        // Fetch customer names for each transaction
+        const mapped = await Promise.all(data.map(async item => {
+          let customerName = 'N/A';
+          if (item.customer_id) {
+            try {
+              const custRes = await fetch(`http://localhost:3000/api/customers/${item.customer_id}`);
+              if (custRes.ok) {
+                const custData = await custRes.json();
+                customerName = `${custData.first_name} ${custData.middle_name ? custData.middle_name + ' ' : ''}${custData.last_name}`;
+              }
+            } catch (err) {
+              customerName = `Customer #${item.customer_id}`;
+            }
+          }
+          return {
+            id: item.sale_id,
+            date: item.sale_date ? new Date(item.sale_date).toISOString().split('T')[0] : '',
+            customer: customerName,
+            amount: item.amount ?? 0,
+            items: item.items ?? 1,
+            status: item.status ?? 'completed',
+            cashier: item.cashier,
+            manager: item.manager
+          };
+        }));
+        setTransactionsData(mapped);
+        setTransactionsError(null);
+      } catch (error) {
+        setTransactionsError(error.message);
+        setTransactionsData([]);
+      } finally {
+        setLoadingTransactions(false);
+      }
+    };
+    fetchTransactions();
+  }, []);
 
   // Mock insights data
   const insightsData = [

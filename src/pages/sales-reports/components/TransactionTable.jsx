@@ -12,63 +12,7 @@ const TransactionTable = ({ transactions }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  const mockTransactions = transactions || [
-    {
-      id: 'TXN-2025-001',
-      date: '2025-08-23',
-      time: '14:32',
-      customer: 'John Smith',
-      items: 'Trek Mountain Bike, Helmet',
-      amount: 1299.99,
-      paymentMethod: 'Credit Card',
-      staff: 'Mike Johnson',
-      status: 'Completed'
-    },
-    {
-      id: 'TXN-2025-002',
-      date: '2025-08-23',
-      time: '13:45',
-      customer: 'Sarah Wilson',
-      items: 'Road Bike Accessories',
-      amount: 245.50,
-      paymentMethod: 'Cash',
-      staff: 'Lisa Chen',
-      status: 'Completed'
-    },
-    {
-      id: 'TXN-2025-003',
-      date: '2025-08-23',
-      time: '12:18',
-      customer: 'David Brown',
-      items: 'Electric Bike, Lock',
-      amount: 2199.00,
-      paymentMethod: 'Debit Card',
-      staff: 'Mike Johnson',
-      status: 'Completed'
-    },
-    {
-      id: 'TXN-2025-004',
-      date: '2025-08-23',
-      time: '11:30',
-      customer: 'Emily Davis',
-      items: 'Bike Repair Service',
-      amount: 85.00,
-      paymentMethod: 'Digital Wallet',
-      staff: 'Tom Rodriguez',
-      status: 'Completed'
-    },
-    {
-      id: 'TXN-2025-005',
-      date: '2025-08-22',
-      time: '16:22',
-      customer: 'Michael Lee',
-      items: 'Mountain Bike, Gloves',
-      amount: 899.99,
-      paymentMethod: 'Credit Card',
-      staff: 'Lisa Chen',
-      status: 'Refunded'
-    }
-  ];
+  const tableTransactions = transactions || [];
 
   const paymentMethodOptions = [
     { value: 'all', label: 'All Payment Methods' },
@@ -79,7 +23,7 @@ const TransactionTable = ({ transactions }) => {
   ];
 
   const filteredAndSortedTransactions = useMemo(() => {
-    let filtered = mockTransactions?.filter(transaction => {
+    let filtered = tableTransactions?.filter(transaction => {
       // Safely convert searchTerm to string and handle empty/null cases
       const searchQuery = (searchTerm || '')?.toLowerCase();
       
