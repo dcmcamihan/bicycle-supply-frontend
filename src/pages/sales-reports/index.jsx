@@ -10,6 +10,39 @@ import TransactionTable from './components/TransactionTable';
 import InsightsPanel from './components/InsightsPanel';
 
 const SalesReports = () => {
+  // Helper to get date range filter
+  function getDateRangeBounds(range) {
+    const now = new Date();
+    let start, end;
+    end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1); // exclusive
+    if (typeof range === 'object' && range !== null && range.start && range.end) {
+      start = new Date(range.start);
+      end = new Date(range.end);
+    } else if (range === 'today') {
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    } else if (range === 'yesterday') {
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+      end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    } else if (range === 'last7days') {
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+    } else if (range === 'last30days') {
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
+    } else if (range === 'thisMonth') {
+      start = new Date(now.getFullYear(), now.getMonth(), 1);
+    } else if (range === 'lastMonth') {
+      start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      end = new Date(now.getFullYear(), now.getMonth(), 1);
+    } else if (range === 'thisYear') {
+      start = new Date(now.getFullYear(), 0, 1);
+    } else if (range === 'lastYear') {
+      start = new Date(now.getFullYear() - 1, 0, 1);
+      end = new Date(now.getFullYear(), 0, 1);
+    } else {
+      // Default to last 7 days
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+    }
+    return { start, end };
+  }
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [dateRange, setDateRange] = useState('last7days');
   const [reportType, setReportType] = useState('daily');
@@ -62,9 +95,16 @@ const SalesReports = () => {
         const salesRes = await fetch('http://localhost:3000/api/sales');
         if (!salesRes.ok) throw new Error('Failed to fetch sales');
         const sales = await salesRes.json();
+        // Filter sales by date range
+        const { start, end } = getDateRangeBounds(dateRange);
+        const filteredSales = sales.filter(sale => {
+          if (!sale.sale_date) return false;
+          const saleDate = new Date(sale.sale_date);
+          return saleDate >= start && saleDate < end;
+        });
         let totalSales = 0;
         const productCountMap = new Map();
-        for (const sale of sales) {
+        for (const sale of filteredSales) {
           try {
             const detailsRes = await fetch(`http://localhost:3000/api/sale-details/sale/${sale.sale_id}`);
             if (!detailsRes.ok) continue;
@@ -87,14 +127,14 @@ const SalesReports = () => {
             }
           } catch {}
         }
-        const avgOrder = sales.length > 0 ? totalSales / sales.length : 0;
+        const avgOrder = filteredSales.length > 0 ? totalSales / filteredSales.length : 0;
         // Get number of unique products sold (or you can get top N by quantity if needed)
         const topProductsCount = productCountMap.size;
         setKpiData(prev => prev.map(kpi => {
           if (kpi.title === 'Total Sales') {
             return { ...kpi, value: totalSales };
           } else if (kpi.title === 'Transactions') {
-            return { ...kpi, value: sales.length };
+            return { ...kpi, value: filteredSales.length };
           } else if (kpi.title === 'Average Order') {
             return { ...kpi, value: avgOrder };
           } else if (kpi.title === 'Top Products') {
@@ -107,7 +147,7 @@ const SalesReports = () => {
             if (kpi.title === 'Total Sales') {
               return { ...kpi, value: totalSales };
             } else if (kpi.title === 'Transactions') {
-              return { ...kpi, value: sales.length };
+              return { ...kpi, value: filteredSales.length };
             } else if (kpi.title === 'Average Order') {
               return { ...kpi, value: avgOrder };
             } else if (kpi.title === 'Top Products') {
@@ -121,7 +161,7 @@ const SalesReports = () => {
       }
     };
     fetchKpis();
-  }, []);
+  }, [dateRange]);
 
   // Mock sales chart data
   const salesChartData = [
