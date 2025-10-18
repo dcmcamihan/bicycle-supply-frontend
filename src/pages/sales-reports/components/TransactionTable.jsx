@@ -27,7 +27,7 @@ const TransactionTable = ({ transactions }) => {
     { value: 'Credit Card', label: 'Credit Card' },
     { value: 'Debit Card', label: 'Debit Card' },
     { value: 'Cash', label: 'Cash' },
-    { value: 'Digital Wallet', label: 'Digital Wallet' }
+    { value: 'E-Wallet Payment', label: 'E-Wallet Payment (Digital Wallet)' }
   ];
 
   const filteredAndSortedTransactions = useMemo(() => {
@@ -211,9 +211,6 @@ const TransactionTable = ({ transactions }) => {
                 Staff
               </th>
               <th className="text-center p-4 font-body font-medium text-sm text-foreground">
-                Status
-              </th>
-              <th className="text-center p-4 font-body font-medium text-sm text-foreground">
                 Actions
               </th>
             </tr>
@@ -261,11 +258,6 @@ const TransactionTable = ({ transactions }) => {
                 <td className="p-4">
                   <span className="font-body text-sm text-foreground">
                     {transaction?.staff}
-                  </span>
-                </td>
-                <td className="p-4 text-center">
-                  <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(transaction?.status)}`}>
-                    {transaction?.status}
                   </span>
                 </td>
                 <td className="p-4 text-center">
