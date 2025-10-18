@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import API_ENDPOINTS from '../../config/api';
 import Header from '../../components/ui/Header';
 import Sidebar from '../../components/ui/Sidebar';
 import Breadcrumb from '../../components/ui/Breadcrumb';
@@ -11,38 +12,100 @@ import InsightsPanel from './components/InsightsPanel';
 
 const SalesReports = () => {
   // Helper to get date range filter
-  function getDateRangeBounds(range) {
+  const getDateRangeBounds = (range) => {
     const now = new Date();
     let start, end;
     end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1); // exclusive
     if (typeof range === 'object' && range !== null && range.start && range.end) {
       start = new Date(range.start);
       end = new Date(range.end);
-    } else if (range === 'today') {
-      start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    } else if (range === 'yesterday') {
-      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-      end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    } else if (range === 'last7days') {
-      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
-    } else if (range === 'last30days') {
-      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
-    } else if (range === 'thisMonth') {
-      start = new Date(now.getFullYear(), now.getMonth(), 1);
-    } else if (range === 'lastMonth') {
-      start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      end = new Date(now.getFullYear(), now.getMonth(), 1);
-    } else if (range === 'thisYear') {
-      start = new Date(now.getFullYear(), 0, 1);
-    } else if (range === 'lastYear') {
-      start = new Date(now.getFullYear() - 1, 0, 1);
-      end = new Date(now.getFullYear(), 0, 1);
     } else {
-      // Default to last 7 days
-      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+      switch (range) {
+        case 'today':
+          start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          break;
+        case 'yesterday':
+          start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+          end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          break;
+        case 'last7days':
+          start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+          break;
+        case 'last30days':
+          start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
+          break;
+        case 'thisMonth':
+          start = new Date(now.getFullYear(), now.getMonth(), 1);
+          break;
+        case 'lastMonth':
+          start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+          end = new Date(now.getFullYear(), now.getMonth(), 1);
+          break;
+        case 'thisYear':
+          start = new Date(now.getFullYear(), 0, 1);
+          break;
+        case 'lastYear':
+          start = new Date(now.getFullYear() - 1, 0, 1);
+          end = new Date(now.getFullYear(), 0, 1);
+          break;
+        default:
+          start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+      }
     }
     return { start, end };
-  }
+  };
+  // Helper: fetch JSON from endpoint
+  const fetchJson = async (url) => {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Failed to fetch: ${url}`);
+    return await res.json();
+  };
+
+  // Helper: fetch sale details and compute total amount
+  const getSaleDetailsAndAmount = async (saleId) => {
+    const details = await fetchJson(API_ENDPOINTS.SALE_DETAILS(saleId));
+    let totalAmount = 0;
+    let itemsCount = 0;
+    for (const detail of details) {
+      const prod = await fetchJson(API_ENDPOINTS.PRODUCT(detail.product_id));
+      const price = parseFloat(prod.price) || 0;
+      totalAmount += price * (detail.quantity_sold || 0);
+      itemsCount += detail.quantity_sold || 0;
+    }
+    return { details, totalAmount, itemsCount };
+  };
+
+  // Helper: fetch payment method description
+  const getPaymentMethod = async (saleId) => {
+    const payData = await fetchJson(API_ENDPOINTS.SALE_PAYMENT_TYPES(saleId));
+    let payment_method_code = '';
+    if (Array.isArray(payData) && payData.length > 0) {
+      payment_method_code = payData[0].payment_method_code || '';
+    } else if (payData.payment_method_code) {
+      payment_method_code = payData.payment_method_code;
+    }
+    if (payment_method_code) {
+      try {
+        const descData = await fetchJson(API_ENDPOINTS.PAYMENT_METHOD(payment_method_code));
+        return descData.description || payment_method_code;
+      } catch {
+        return payment_method_code;
+      }
+    }
+    return '';
+  };
+
+  // Helper: fetch staff name
+  const getStaffName = async (cashierId) => {
+    if (!cashierId) return '';
+    try {
+      const staffData = await fetchJson(API_ENDPOINTS.EMPLOYEE(cashierId));
+      let middleInitial = staffData.middle_name?.trim()?.[0]?.toUpperCase() ? staffData.middle_name.trim()[0].toUpperCase() + '. ' : '';
+      return `${staffData.first_name} ${middleInitial}${staffData.last_name}`;
+    } catch {
+      return `Employee #${cashierId}`;
+    }
+  };
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [dateRange, setDateRange] = useState('last7days');
   const [reportType, setReportType] = useState('daily');
@@ -92,58 +155,41 @@ const SalesReports = () => {
   useEffect(() => {
     const fetchKpisAndTransactions = async () => {
       setLoadingTransactions(true);
-      console.log('[SalesReports] useEffect triggered, dateRange:', dateRange);
       try {
-        const salesRes = await fetch('http://localhost:3000/api/sales');
-        if (!salesRes.ok) throw new Error('Failed to fetch sales');
-        const sales = await salesRes.json();
-        // Filter sales by date range
+        const sales = await fetchJson(API_ENDPOINTS.SALES);
         const { start, end } = getDateRangeBounds(dateRange);
         const filteredSales = sales.filter(sale => {
           if (!sale.sale_date) return false;
           const saleDate = new Date(sale.sale_date);
           return saleDate >= start && saleDate < end;
         });
-        console.log('[SalesReports] filteredSales:', filteredSales);
 
         // KPI calculations
         let totalSales = 0;
         const productCountMap = new Map();
         for (const sale of filteredSales) {
           try {
-            const detailsRes = await fetch(`http://localhost:3000/api/sale-details/sale/${sale.sale_id}`);
-            if (!detailsRes.ok) continue;
-            const details = await detailsRes.json();
+            const { details } = await getSaleDetailsAndAmount(sale.sale_id);
             for (const detail of details) {
-              try {
-                const prodRes = await fetch(`http://localhost:3000/api/products/${detail.product_id}`);
-                if (!prodRes.ok) continue;
-                const prod = await prodRes.json();
-                const price = parseFloat(prod.price) || 0;
-                totalSales += price * (detail.quantity_sold || 0);
-                // Count product for top products
-                if (detail.product_id) {
-                  productCountMap.set(
-                    detail.product_id,
-                    (productCountMap.get(detail.product_id) || 0) + (detail.quantity_sold || 0)
-                  );
-                }
-              } catch {}
+              const prod = await fetchJson(API_ENDPOINTS.PRODUCT(detail.product_id));
+              const price = parseFloat(prod.price) || 0;
+              totalSales += price * (detail.quantity_sold || 0);
+              if (detail.product_id) {
+                productCountMap.set(
+                  detail.product_id,
+                  (productCountMap.get(detail.product_id) || 0) + (detail.quantity_sold || 0)
+                );
+              }
             }
           } catch {}
         }
         const avgOrder = filteredSales.length > 0 ? totalSales / filteredSales.length : 0;
         const topProductsCount = productCountMap.size;
         setKpiData(prev => prev.map(kpi => {
-          if (kpi.title === 'Total Sales') {
-            return { ...kpi, value: totalSales };
-          } else if (kpi.title === 'Transactions') {
-            return { ...kpi, value: filteredSales.length };
-          } else if (kpi.title === 'Average Order') {
-            return { ...kpi, value: avgOrder };
-          } else if (kpi.title === 'Top Products') {
-            return { ...kpi, value: topProductsCount };
-          }
+          if (kpi.title === 'Total Sales') return { ...kpi, value: totalSales };
+          if (kpi.title === 'Transactions') return { ...kpi, value: filteredSales.length };
+          if (kpi.title === 'Average Order') return { ...kpi, value: avgOrder };
+          if (kpi.title === 'Top Products') return { ...kpi, value: topProductsCount };
           return kpi;
         }));
 
@@ -152,94 +198,34 @@ const SalesReports = () => {
           let customerName = 'N/A';
           if (item.customer_id) {
             try {
-              const custRes = await fetch(`http://localhost:3000/api/customers/${item.customer_id}`);
-              if (custRes.ok) {
-                const custData = await custRes.json();
-                customerName = `${custData.first_name} ${custData.middle_name ? custData.middle_name + ' ' : ''}${custData.last_name}`;
-              }
-            } catch (err) {
+              const custData = await fetchJson(API_ENDPOINTS.CUSTOMER(item.customer_id));
+              customerName = `${custData.first_name} ${custData.middle_name ? custData.middle_name + ' ' : ''}${custData.last_name}`;
+            } catch {
               customerName = `Customer #${item.customer_id}`;
             }
           }
-
-          // Fetch sale details and sum quantity_sold for items
           let itemsCount = 0;
           let totalAmount = 0;
           try {
-            const detailsRes = await fetch(`http://localhost:3000/api/sale-details/sale/${item.sale_id}`);
-            if (detailsRes.ok) {
-              const detailsData = await detailsRes.json();
-              itemsCount = detailsData.reduce((sum, detail) => sum + (detail.quantity_sold || 0), 0);
-
-              // Fetch product prices and compute total amount
-              for (const detail of detailsData) {
-                try {
-                  const prodRes = await fetch(`http://localhost:3000/api/products/${detail.product_id}`);
-                  if (prodRes.ok) {
-                    const prodData = await prodRes.json();
-                    const price = parseFloat(prodData.price) || 0;
-                    totalAmount += price * (detail.quantity_sold || 0);
-                  }
-                } catch (err) {
-                  // If product fetch fails, skip
-                }
-              }
-            }
-          } catch (err) {
+            const { totalAmount: amt, itemsCount: cnt } = await getSaleDetailsAndAmount(item.sale_id);
+            itemsCount = cnt;
+            totalAmount = amt;
+          } catch {
             itemsCount = 0;
             totalAmount = 0;
           }
-
-          // Fetch payment method description
           let paymentMethod = '';
           try {
-            const payRes = await fetch(`http://localhost:3000/api/sale-payment-types/sale/${item.sale_id}`);
-            if (payRes.ok) {
-              const payData = await payRes.json();
-              let payment_method_code = '';
-              if (Array.isArray(payData) && payData.length > 0) {
-                payment_method_code = payData[0].payment_method_code || '';
-              } else if (payData.payment_method_code) {
-                payment_method_code = payData.payment_method_code;
-              }
-              if (payment_method_code) {
-                try {
-                  const descRes = await fetch(`http://localhost:3000/api/payment-methods/${payment_method_code}`);
-                  if (descRes.ok) {
-                    const descData = await descRes.json();
-                    paymentMethod = descData.description || payment_method_code;
-                  } else {
-                    paymentMethod = payment_method_code;
-                  }
-                } catch (err) {
-                  paymentMethod = payment_method_code;
-                }
-              }
-            }
-          } catch (err) {
+            paymentMethod = await getPaymentMethod(item.sale_id);
+          } catch {
             paymentMethod = '';
           }
-
-          // Fetch staff (cashier) full name
           let staffName = '';
-          if (item.cashier) {
-            try {
-              const staffRes = await fetch(`http://localhost:3000/api/employees/${item.cashier}`);
-              if (staffRes.ok) {
-                const staffData = await staffRes.json();
-                let middleInitial = '';
-                if (staffData.middle_name) {
-                  middleInitial = staffData.middle_name.trim().length > 0 ? staffData.middle_name.trim()[0].toUpperCase() + '. ' : '';
-                }
-                staffName = `${staffData.first_name} ${middleInitial}${staffData.last_name}`;
-              } else {
-                staffName = `Employee #${item.cashier}`;
-              }
-            } catch (err) {
-              staffName = `Employee #${item.cashier}`;
-            }
+          try {
+            staffName = await getStaffName(item.cashier);
+          } catch {
+            staffName = `Employee #${item.cashier}`;
           }
-
           return {
             id: item.sale_id,
             date: item.sale_date ? new Date(item.sale_date).toISOString().split('T')[0] : '',
@@ -252,7 +238,6 @@ const SalesReports = () => {
             manager: item.manager
           };
         }));
-        console.log('[SalesReports] mapped transactions:', mapped);
         setTransactionsData(mapped);
         setTransactionsError(null);
       } catch (error) {
