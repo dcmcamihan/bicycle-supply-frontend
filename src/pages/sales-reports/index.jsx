@@ -15,11 +15,11 @@ const SalesReports = () => {
   const [reportType, setReportType] = useState('daily');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Mock KPI data
-  const kpiData = [
+  // KPI data state
+  const [kpiData, setKpiData] = useState([
     {
       title: 'Total Sales',
-      value: 128450,
+      value: 0,
       type: 'currency',
       change: 12.5,
       period: 'last week',
@@ -53,7 +53,75 @@ const SalesReports = () => {
       icon: 'Star',
       bgColor: 'bg-success'
     }
-  ];
+  ]);
+
+  // Fetch and compute total sales for KPI
+  useEffect(() => {
+    const fetchKpis = async () => {
+      try {
+        const salesRes = await fetch('http://localhost:3000/api/sales');
+        if (!salesRes.ok) throw new Error('Failed to fetch sales');
+        const sales = await salesRes.json();
+        let totalSales = 0;
+        const productCountMap = new Map();
+        for (const sale of sales) {
+          try {
+            const detailsRes = await fetch(`http://localhost:3000/api/sale-details/sale/${sale.sale_id}`);
+            if (!detailsRes.ok) continue;
+            const details = await detailsRes.json();
+            for (const detail of details) {
+              try {
+                const prodRes = await fetch(`http://localhost:3000/api/products/${detail.product_id}`);
+                if (!prodRes.ok) continue;
+                const prod = await prodRes.json();
+                const price = parseFloat(prod.price) || 0;
+                totalSales += price * (detail.quantity_sold || 0);
+                // Count product for top products
+                if (detail.product_id) {
+                  productCountMap.set(
+                    detail.product_id,
+                    (productCountMap.get(detail.product_id) || 0) + (detail.quantity_sold || 0)
+                  );
+                }
+              } catch {}
+            }
+          } catch {}
+        }
+        const avgOrder = sales.length > 0 ? totalSales / sales.length : 0;
+        // Get number of unique products sold (or you can get top N by quantity if needed)
+        const topProductsCount = productCountMap.size;
+        setKpiData(prev => prev.map(kpi => {
+          if (kpi.title === 'Total Sales') {
+            return { ...kpi, value: totalSales };
+          } else if (kpi.title === 'Transactions') {
+            return { ...kpi, value: sales.length };
+          } else if (kpi.title === 'Average Order') {
+            return { ...kpi, value: avgOrder };
+          } else if (kpi.title === 'Top Products') {
+            return { ...kpi, value: topProductsCount };
+          }
+          return kpi;
+        }));
+        console.log('Updated KPI Data:', [
+          ...kpiData.map(kpi => {
+            if (kpi.title === 'Total Sales') {
+              return { ...kpi, value: totalSales };
+            } else if (kpi.title === 'Transactions') {
+              return { ...kpi, value: sales.length };
+            } else if (kpi.title === 'Average Order') {
+              return { ...kpi, value: avgOrder };
+            } else if (kpi.title === 'Top Products') {
+              return { ...kpi, value: topProductsCount };
+            }
+            return kpi;
+          })
+        ]);
+      } catch (err) {
+        // Optionally handle error
+      }
+    };
+    fetchKpis();
+  }, []);
 
   // Mock sales chart data
   const salesChartData = [
