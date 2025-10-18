@@ -300,8 +300,9 @@ const InventoryManagement = () => {
 
   // Get low stock items
   const lowStockItems = useMemo(() => {
-    return mockProducts?.filter(product => product?.stock > 0 && product?.stock <= product?.reorderLevel)?.slice(0, 5);
-  }, []);
+    // Always use real API data (mockProducts is mapped from API)
+    return mockProducts?.filter(product => product?.stock > 0 && product?.stock <= (product?.reorderLevel ?? 3))?.slice(0, 5);
+  }, [mockProducts]);
 
   const handleSidebarToggle = () => {
     setSidebarCollapsed(!sidebarCollapsed);
