@@ -87,16 +87,33 @@ const PointOfSale = () => {
     fetchCategories();
   }, []);
 
+
+
   // Filter products based on search and category
-  const filteredProducts = products?.filter(product => {
-    const matchesSearch = (
-      product?.name?.toLowerCase()?.includes(searchTerm?.toLowerCase()) ||
-      product?.sku?.toLowerCase()?.includes(searchTerm?.toLowerCase()) ||
-      product?.id?.toString()?.includes(searchTerm)
-    );
-    const matchesCategory = activeCategory === 'all' || product?.category === activeCategory;
-    return matchesSearch && matchesCategory;
-  });
+  const filteredProducts = React.useMemo(() => {
+    if (!Array.isArray(products)) return [];
+    if ((!searchTerm || searchTerm.trim() === '') && (activeCategory === 'all' || !activeCategory)) {
+      return [...products];
+    }
+    return products.filter(product => {
+      const matchesSearch = (
+        (product?.name?.toLowerCase() || '').includes((searchTerm || '').toLowerCase()) ||
+        (product?.id?.toString() || '').includes(searchTerm || '')
+      );
+      const matchesCategory = activeCategory === 'all' || product?.category === activeCategory;
+      return matchesSearch && matchesCategory;
+    });
+  }, [products, searchTerm, activeCategory]);
+
+  // Debug logs to help diagnose issues
+  React.useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.log('products:', products);
+    // eslint-disable-next-line no-console
+    console.log('filteredProducts:', filteredProducts);
+    // eslint-disable-next-line no-console
+    console.log('searchTerm:', searchTerm, 'activeCategory:', activeCategory);
+  }, [products, filteredProducts, searchTerm, activeCategory]);
 
   const handleSearch = (term) => {
     setSearchTerm(term);
@@ -298,6 +315,7 @@ const PointOfSale = () => {
                 {/* Left Panel - Products (60% width on desktop) */}
                 <div className="xl:col-span-3 space-y-6">
                   <ProductSearch 
+                    searchTerm={searchTerm}
                     onSearch={handleSearch}
                   />
                   
@@ -310,6 +328,7 @@ const PointOfSale = () => {
                   <ProductGrid
                     products={filteredProducts}
                     onAddToCart={handleAddToCart}
+                    loading={loadingProducts}
                   />
                 </div>
                 {/* Right Panel - Cart & Checkout (40% width on desktop) */}

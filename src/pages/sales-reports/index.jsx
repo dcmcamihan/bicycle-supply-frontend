@@ -250,16 +250,81 @@ const SalesReports = () => {
     fetchKpisAndTransactions();
   }, [dateRange]);
 
-  // Mock sales chart data
-  const salesChartData = [
-    { name: 'Mon', sales: 12500, transactions: 45, avgOrder: 278 },
-    { name: 'Tue', sales: 15200, transactions: 52, avgOrder: 292 },
-    { name: 'Wed', sales: 18900, transactions: 61, avgOrder: 310 },
-    { name: 'Thu', sales: 16700, transactions: 48, avgOrder: 348 },
-    { name: 'Fri', sales: 22100, transactions: 67, avgOrder: 330 },
-    { name: 'Sat', sales: 28500, transactions: 89, avgOrder: 320 },
-    { name: 'Sun', sales: 19800, transactions: 58, avgOrder: 341 }
-  ];
+  // Real sales chart data from API
+  const [salesChartData, setSalesChartData] = useState([
+    { name: 'Mon', sales: 0, transactions: 0, avgOrder: 0 },
+    { name: 'Tue', sales: 0, transactions: 0, avgOrder: 0 },
+    { name: 'Wed', sales: 0, transactions: 0, avgOrder: 0 },
+    { name: 'Thu', sales: 0, transactions: 0, avgOrder: 0 },
+    { name: 'Fri', sales: 0, transactions: 0, avgOrder: 0 },
+    { name: 'Sat', sales: 0, transactions: 0, avgOrder: 0 },
+    { name: 'Sun', sales: 0, transactions: 0, avgOrder: 0 }
+  ]);
+
+  useEffect(() => {
+    const fetchSalesChartData = async () => {
+      try {
+        const sales = await fetchJson(API_ENDPOINTS.SALES);
+        const { start, end } = getDateRangeBounds(dateRange);
+        const filteredSales = sales.filter(sale => {
+          if (!sale.sale_date) return false;
+          const saleDate = new Date(sale.sale_date);
+          return saleDate >= start && saleDate < end;
+        });
+        // Group by day of week
+        const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const chartMap = {
+          'Mon': { sales: 0, transactions: 0, avgOrder: 0 },
+          'Tue': { sales: 0, transactions: 0, avgOrder: 0 },
+          'Wed': { sales: 0, transactions: 0, avgOrder: 0 },
+          'Thu': { sales: 0, transactions: 0, avgOrder: 0 },
+          'Fri': { sales: 0, transactions: 0, avgOrder: 0 },
+          'Sat': { sales: 0, transactions: 0, avgOrder: 0 },
+          'Sun': { sales: 0, transactions: 0, avgOrder: 0 }
+        };
+        for (const sale of filteredSales) {
+          const dateObj = new Date(sale.sale_date);
+          const dayName = weekDays[dateObj.getDay()];
+          let totalAmount = 0;
+          try {
+            const { totalAmount: amt } = await getSaleDetailsAndAmount(sale.sale_id);
+            totalAmount = amt;
+          } catch {
+            totalAmount = 0;
+          }
+          chartMap[dayName].sales += totalAmount;
+          chartMap[dayName].transactions += 1;
+        }
+        // Calculate avgOrder for each day
+        for (const day of weekDays) {
+          const t = chartMap[day].transactions;
+          chartMap[day].avgOrder = t > 0 ? chartMap[day].sales / t : 0;
+        }
+        // Set in Mon-Sun order
+        setSalesChartData([
+          { name: 'Mon', ...chartMap['Mon'] },
+          { name: 'Tue', ...chartMap['Tue'] },
+          { name: 'Wed', ...chartMap['Wed'] },
+          { name: 'Thu', ...chartMap['Thu'] },
+          { name: 'Fri', ...chartMap['Fri'] },
+          { name: 'Sat', ...chartMap['Sat'] },
+          { name: 'Sun', ...chartMap['Sun'] }
+        ]);
+      } catch (e) {
+        // fallback to empty data
+        setSalesChartData([
+          { name: 'Mon', sales: 0, transactions: 0, avgOrder: 0 },
+          { name: 'Tue', sales: 0, transactions: 0, avgOrder: 0 },
+          { name: 'Wed', sales: 0, transactions: 0, avgOrder: 0 },
+          { name: 'Thu', sales: 0, transactions: 0, avgOrder: 0 },
+          { name: 'Fri', sales: 0, transactions: 0, avgOrder: 0 },
+          { name: 'Sat', sales: 0, transactions: 0, avgOrder: 0 },
+          { name: 'Sun', sales: 0, transactions: 0, avgOrder: 0 }
+        ]);
+      }
+    };
+    fetchSalesChartData();
+  }, [dateRange]);
 
   // Mock category data
   const categoryData = [

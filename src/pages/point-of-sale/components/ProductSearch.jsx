@@ -3,12 +3,9 @@ import React, { useState } from 'react';
 import Input from '../../../components/ui/Input';
 import Button from '../../../components/ui/Button';
 
-const ProductSearch = ({ onSearch }) => {
-  const [searchTerm, setSearchTerm] = useState('');
-
+const ProductSearch = ({ searchTerm, onSearch }) => {
   const handleSearchChange = (e) => {
     const value = e?.target?.value;
-    setSearchTerm(value);
     onSearch(value);
   };
 
@@ -16,8 +13,6 @@ const ProductSearch = ({ onSearch }) => {
     e?.preventDefault();
     onSearch(searchTerm);
   };
-
-  
 
   return (
     <div className="bg-card border border-border rounded-lg p-4 shadow-subtle">
@@ -31,7 +26,6 @@ const ProductSearch = ({ onSearch }) => {
             className="w-full"
           />
         </div>
-        
         <Button
           type="submit"
           variant="default"

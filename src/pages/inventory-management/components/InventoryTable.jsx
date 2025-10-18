@@ -15,6 +15,10 @@ const InventoryTable = ({
   sortConfig,
   onSort 
 }) => {
+  React.useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.log('[InventoryTable] mounted. products:', products);
+  }, [products]);
   const [hoveredRow, setHoveredRow] = useState(null);
 
   const getStockStatusColor = (stock, reorderLevel) => {
