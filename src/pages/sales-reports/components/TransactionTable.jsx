@@ -5,6 +5,14 @@ import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
 
 const TransactionTable = ({ transactions }) => {
+  // Reset all filters and pagination when transactions change
+  React.useEffect(() => {
+    setSearchTerm('');
+    setFilterPayment('all');
+    setSortField('date');
+    setSortDirection('desc');
+    setCurrentPage(1);
+  }, [transactions]);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortField, setSortField] = useState('date');
   const [sortDirection, setSortDirection] = useState('desc');
@@ -48,15 +56,18 @@ const TransactionTable = ({ transactions }) => {
     filtered?.sort((a, b) => {
       let aValue = a?.[sortField];
       let bValue = b?.[sortField];
-      
+
       if (sortField === 'amount') {
         aValue = parseFloat(aValue);
         bValue = parseFloat(bValue);
       } else if (sortField === 'date') {
-        aValue = new Date(a.date + ' ' + a.time);
-        bValue = new Date(b.date + ' ' + b.time);
+        // Fallback to just date if time is missing
+        const aDateTime = a.date + (a.time ? ' ' + a.time : '');
+        const bDateTime = b.date + (b.time ? ' ' + b.time : '');
+        aValue = new Date(aDateTime);
+        bValue = new Date(bDateTime);
       }
-      
+
       if (sortDirection === 'asc') {
         return aValue > bValue ? 1 : -1;
       } else {
@@ -220,9 +231,11 @@ const TransactionTable = ({ transactions }) => {
                     <p className="font-body text-sm text-foreground">
                       {formatDate(transaction?.date)}
                     </p>
-                    <p className="font-caption text-xs text-muted-foreground">
-                      {transaction?.time}
-                    </p>
+                    {transaction?.time && (
+                      <p className="font-caption text-xs text-muted-foreground">
+                        {transaction?.time}
+                      </p>
+                    )}
                   </div>
                 </td>
                 <td className="p-4">
