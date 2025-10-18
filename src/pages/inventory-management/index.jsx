@@ -11,6 +11,7 @@ import BulkActionsToolbar from './components/BulkActionsToolbar';
 import InventorySidebar from './components/InventorySidebar';
 import ProductModal from './components/ProductModal';
 import MobileInventoryCard from './components/MobileInventoryCard';
+import API_ENDPOINTS from '../../config/api';
 
 const InventoryManagement = () => {
   // Brands state
@@ -20,7 +21,7 @@ const InventoryManagement = () => {
   useEffect(() => {
     const fetchBrands = async () => {
       try {
-        const response = await fetch('http://localhost:3000/api/brands');
+        const response = await fetch(API_ENDPOINTS.BRANDS);
         const data = await response.json();
         setBrands(data);
       } catch (error) {
@@ -36,7 +37,7 @@ const InventoryManagement = () => {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await fetch('http://localhost:3000/api/categories');
+        const response = await fetch(API_ENDPOINTS.CATEGORIES);
         const data = await response.json();
         setCategories(data);
       } catch (error) {
@@ -67,7 +68,7 @@ const InventoryManagement = () => {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const response = await fetch('http://localhost:3000/api/products');
+        const response = await fetch(API_ENDPOINTS.PRODUCTS);
         const data = await response.json();
         setRawProducts(data);
       } catch (error) {
@@ -84,7 +85,7 @@ const InventoryManagement = () => {
         rawProducts.map(async item => {
           let quantityOnHand = 0;
           try {
-            const qtyRes = await fetch(`http://localhost:3000/api/products/${item.product_id}/quantity-on-hand`);
+      const qtyRes = await fetch(`${API_ENDPOINTS.PRODUCT(item.product_id)}/quantity-on-hand`);
             const qty = await qtyRes.json();
             quantityOnHand = Number(qty);
           } catch (err) {
@@ -143,7 +144,7 @@ const InventoryManagement = () => {
   useEffect(() => {
     const fetchSuppliers = async () => {
       try {
-        const response = await fetch('http://localhost:3000/api/suppliers');
+        const response = await fetch(API_ENDPOINTS.SUPPLIERS);
         const data = await response.json();
         // Map API data to expected structure
         const mapped = data.map(item => ({
@@ -282,19 +283,20 @@ const InventoryManagement = () => {
   }, [filters, filteredAndSortedProducts]);
 
   // Calculate summary data
+  // Calculate summary data from real API product data
   const summaryData = useMemo(() => {
-    const totalProducts = mockProducts?.length;
-    const totalValue = mockProducts?.reduce((sum, product) => sum + (product?.price * product?.stock), 0);
-    const lowStockCount = mockProducts?.filter(p => p?.stock > 0 && p?.stock <= p?.reorderLevel)?.length;
-    const outOfStockCount = mockProducts?.filter(p => p?.stock === 0)?.length;
-
+    // Use mockProducts, which is mapped from real API data
+    const totalProducts = mockProducts?.length || 0;
+    const totalValue = mockProducts?.reduce((sum, product) => sum + ((product?.price || 0) * (product?.stock || 0)), 0);
+    const lowStockCount = mockProducts?.filter(p => (p?.stock > 0 && p?.stock <= (p?.reorderLevel ?? 3)))?.length || 0;
+    const outOfStockCount = mockProducts?.filter(p => p?.stock === 0)?.length || 0;
     return {
       totalProducts,
       totalValue,
       lowStockCount,
       outOfStockCount
     };
-  }, []);
+  }, [mockProducts]);
 
   // Get low stock items
   const lowStockItems = useMemo(() => {
