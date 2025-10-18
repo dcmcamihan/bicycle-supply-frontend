@@ -90,7 +90,7 @@ const SalesReports = () => {
 
   // Fetch and compute total sales for KPI
   useEffect(() => {
-    const fetchKpis = async () => {
+    const fetchKpisAndTransactions = async () => {
       try {
         const salesRes = await fetch('http://localhost:3000/api/sales');
         if (!salesRes.ok) throw new Error('Failed to fetch sales');
@@ -102,6 +102,8 @@ const SalesReports = () => {
           const saleDate = new Date(sale.sale_date);
           return saleDate >= start && saleDate < end;
         });
+
+        // KPI calculations
         let totalSales = 0;
         const productCountMap = new Map();
         for (const sale of filteredSales) {
@@ -128,7 +130,6 @@ const SalesReports = () => {
           } catch {}
         }
         const avgOrder = filteredSales.length > 0 ? totalSales / filteredSales.length : 0;
-        // Get number of unique products sold (or you can get top N by quantity if needed)
         const topProductsCount = productCountMap.size;
         setKpiData(prev => prev.map(kpi => {
           if (kpi.title === 'Total Sales') {
@@ -142,25 +143,122 @@ const SalesReports = () => {
           }
           return kpi;
         }));
-        console.log('Updated KPI Data:', [
-          ...kpiData.map(kpi => {
-            if (kpi.title === 'Total Sales') {
-              return { ...kpi, value: totalSales };
-            } else if (kpi.title === 'Transactions') {
-              return { ...kpi, value: filteredSales.length };
-            } else if (kpi.title === 'Average Order') {
-              return { ...kpi, value: avgOrder };
-            } else if (kpi.title === 'Top Products') {
-              return { ...kpi, value: topProductsCount };
+
+        // Transactions data
+        const mapped = await Promise.all(filteredSales.map(async item => {
+          let customerName = 'N/A';
+          if (item.customer_id) {
+            try {
+              const custRes = await fetch(`http://localhost:3000/api/customers/${item.customer_id}`);
+              if (custRes.ok) {
+                const custData = await custRes.json();
+                customerName = `${custData.first_name} ${custData.middle_name ? custData.middle_name + ' ' : ''}${custData.last_name}`;
+              }
+            } catch (err) {
+              customerName = `Customer #${item.customer_id}`;
             }
-            return kpi;
-          })
-        ]);
-      } catch (err) {
-        // Optionally handle error
+          }
+
+          // Fetch sale details and sum quantity_sold for items
+          let itemsCount = 0;
+          let totalAmount = 0;
+          try {
+            const detailsRes = await fetch(`http://localhost:3000/api/sale-details/sale/${item.sale_id}`);
+            if (detailsRes.ok) {
+              const detailsData = await detailsRes.json();
+              itemsCount = detailsData.reduce((sum, detail) => sum + (detail.quantity_sold || 0), 0);
+
+              // Fetch product prices and compute total amount
+              for (const detail of detailsData) {
+                try {
+                  const prodRes = await fetch(`http://localhost:3000/api/products/${detail.product_id}`);
+                  if (prodRes.ok) {
+                    const prodData = await prodRes.json();
+                    const price = parseFloat(prodData.price) || 0;
+                    totalAmount += price * (detail.quantity_sold || 0);
+                  }
+                } catch (err) {
+                  // If product fetch fails, skip
+                }
+              }
+            }
+          } catch (err) {
+            itemsCount = 0;
+            totalAmount = 0;
+          }
+
+          // Fetch payment method description
+          let paymentMethod = '';
+          try {
+            const payRes = await fetch(`http://localhost:3000/api/sale-payment-types/sale/${item.sale_id}`);
+            if (payRes.ok) {
+              const payData = await payRes.json();
+              let payment_method_code = '';
+              if (Array.isArray(payData) && payData.length > 0) {
+                payment_method_code = payData[0].payment_method_code || '';
+              } else if (payData.payment_method_code) {
+                payment_method_code = payData.payment_method_code;
+              }
+              if (payment_method_code) {
+                try {
+                  const descRes = await fetch(`http://localhost:3000/api/payment-methods/${payment_method_code}`);
+                  if (descRes.ok) {
+                    const descData = await descRes.json();
+                    paymentMethod = descData.description || payment_method_code;
+                  } else {
+                    paymentMethod = payment_method_code;
+                  }
+                } catch (err) {
+                  paymentMethod = payment_method_code;
+                }
+              }
+            }
+          } catch (err) {
+            paymentMethod = '';
+          }
+
+          // Fetch staff (cashier) full name
+          let staffName = '';
+          if (item.cashier) {
+            try {
+              const staffRes = await fetch(`http://localhost:3000/api/employees/${item.cashier}`);
+              if (staffRes.ok) {
+                const staffData = await staffRes.json();
+                let middleInitial = '';
+                if (staffData.middle_name) {
+                  middleInitial = staffData.middle_name.trim().length > 0 ? staffData.middle_name.trim()[0].toUpperCase() + '. ' : '';
+                }
+                staffName = `${staffData.first_name} ${middleInitial}${staffData.last_name}`;
+              } else {
+                staffName = `Employee #${item.cashier}`;
+              }
+            } catch (err) {
+              staffName = `Employee #${item.cashier}`;
+            }
+          }
+
+          return {
+            id: item.sale_id,
+            date: item.sale_date ? new Date(item.sale_date).toISOString().split('T')[0] : '',
+            customer: customerName,
+            amount: totalAmount,
+            items: itemsCount,
+            paymentMethod,
+            status: item.status ?? 'completed',
+            staff: staffName,
+            manager: item.manager
+          };
+        }));
+        setTransactionsData(mapped);
+        setTransactionsError(null);
+      } catch (error) {
+        setTransactionsError(error.message);
+        setTransactionsData([]);
+      } finally {
+        setLoadingTransactions(false);
       }
     };
-    fetchKpis();
+    fetchKpisAndTransactions();
   }, [dateRange]);
 
   // Mock sales chart data
@@ -194,9 +292,15 @@ const SalesReports = () => {
         const response = await fetch('http://localhost:3000/api/sales');
         if (!response.ok) throw new Error('Failed to fetch transactions');
         const data = await response.json();
-
+        // Filter sales by date range
+        const { start, end } = getDateRangeBounds(dateRange);
+        const filteredData = data.filter(sale => {
+          if (!sale.sale_date) return false;
+          const saleDate = new Date(sale.sale_date);
+          return saleDate >= start && saleDate < end;
+        });
         // Fetch customer names for each transaction
-        const mapped = await Promise.all(data.map(async item => {
+        const mapped = await Promise.all(filteredData.map(async item => {
           let customerName = 'N/A';
           if (item.customer_id) {
             try {
@@ -310,7 +414,7 @@ const SalesReports = () => {
       }
     };
     fetchTransactions();
-  }, []);
+  }, [dateRange]);
 
   // Mock insights data
   const insightsData = [
