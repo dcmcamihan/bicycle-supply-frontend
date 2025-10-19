@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import API_ENDPOINTS from '../../config/api';
 import { Helmet } from 'react-helmet';
 import Header from '../../components/ui/Header';
 import Sidebar from '../../components/ui/Sidebar';
@@ -30,7 +31,7 @@ const PointOfSale = () => {
     const fetchProducts = async () => {
       try {
         setLoadingProducts(true);
-        const response = await fetch('http://localhost:3000/api/products');
+  const response = await fetch(API_ENDPOINTS.PRODUCTS);
         if (!response.ok) throw new Error('Failed to fetch products');
         const data = await response.json();
         // Map API data to expected format for POS
@@ -38,7 +39,7 @@ const PointOfSale = () => {
           data.map(async item => {
             let stock = 0;
             try {
-              const stockRes = await fetch(`http://localhost:3000/api/products/${item.product_id}/quantity-on-hand`);
+              const stockRes = await fetch(`${API_ENDPOINTS.PRODUCT(item.product_id)}/quantity-on-hand`);
               if (stockRes.ok) {
                 stock = await stockRes.json();
               }
@@ -75,7 +76,7 @@ const PointOfSale = () => {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await fetch('http://localhost:3000/api/categories');
+  const response = await fetch(API_ENDPOINTS.CATEGORIES);
         if (!response.ok) throw new Error('Failed to fetch categories');
         const data = await response.json();
         setCategories(data);
