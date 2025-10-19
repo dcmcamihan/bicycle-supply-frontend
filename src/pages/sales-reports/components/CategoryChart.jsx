@@ -1,17 +1,129 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 import Button from '../../../components/ui/Button';
 
-const CategoryChart = ({ data, title = "Category Performance" }) => {
-  const [viewType, setViewType] = useState('pie');
+import API_ENDPOINTS from '../../../config/api';
 
-  const categoryData = data || [
-    { name: 'Mountain Bikes', value: 45200, percentage: 35.2, color: '#2D5A27' },
-    { name: 'Road Bikes', value: 38900, percentage: 30.3, color: '#4A7C59' },
-    { name: 'Electric Bikes', value: 28500, percentage: 22.2, color: '#E67E22' },
-    { name: 'Accessories', value: 15800, percentage: 12.3, color: '#27AE60' }
-  ];
+const CATEGORY_COLORS = {
+  'BIKECOMP': '#2D5A27',
+  'MTNBIKE': '#4A7C59',
+  'ROADBIKE': '#E67E22',
+  'ACCESSORY': '#27AE60',
+  // Add more mappings as needed
+};
+
+const CategoryChart = ({ data, title = "Category Performance", dateRange }) => {
+  const [viewType, setViewType] = useState('pie');
+  const [categoryData, setCategoryData] = useState([]);
+
+  // Helper to get date range bounds (copied from sales-reports/index.jsx)
+  const getDateRangeBounds = (range) => {
+    const now = new Date();
+    let start, end;
+    end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1); // exclusive
+    if (typeof range === 'object' && range !== null && range.start && range.end) {
+      start = new Date(range.start);
+      end = new Date(range.end);
+    } else {
+      switch (range) {
+        case 'today':
+          start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          break;
+        case 'yesterday':
+          start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+          end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          break;
+        case 'last7days':
+          start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+          break;
+        case 'last30days':
+          start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
+          break;
+        case 'thisMonth':
+          start = new Date(now.getFullYear(), now.getMonth(), 1);
+          break;
+        case 'lastMonth':
+          start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+          end = new Date(now.getFullYear(), now.getMonth(), 1);
+          break;
+        case 'thisYear':
+          start = new Date(now.getFullYear(), 0, 1);
+          break;
+        case 'lastYear':
+          start = new Date(now.getFullYear() - 1, 0, 1);
+          end = new Date(now.getFullYear(), 0, 1);
+          break;
+        default:
+          start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+      }
+    }
+    return { start, end };
+  };
+
+  useEffect(() => {
+    const fetchCategoryPerformance = async () => {
+      try {
+        // 1. Fetch all categories for mapping
+        const categoriesRes = await fetch(API_ENDPOINTS.CATEGORIES);
+        const categoriesList = await categoriesRes.json();
+        const categoryMap = {};
+        categoriesList.forEach(cat => {
+          categoryMap[cat.category_code] = cat.category_name;
+        });
+
+        // 2. Fetch all sales
+        const salesRes = await fetch(API_ENDPOINTS.SALES);
+        const sales = await salesRes.json();
+        // Apply date filter
+        const { start, end } = getDateRangeBounds(dateRange);
+        const filteredSales = sales.filter(sale => {
+          if (!sale.sale_date) return false;
+          const saleDate = new Date(sale.sale_date);
+          return saleDate >= start && saleDate < end;
+        });
+        const saleIds = filteredSales.map(sale => sale.sale_id);
+
+        // 3. For each sale, fetch sale details
+        let allSaleDetails = [];
+        for (const saleId of saleIds) {
+          const detailsRes = await fetch(API_ENDPOINTS.SALE_DETAILS(saleId));
+          const details = await detailsRes.json();
+          allSaleDetails = allSaleDetails.concat(details);
+        }
+
+        // 4. Aggregate sales by category
+        const categoryTotals = {};
+        for (const detail of allSaleDetails) {
+          // Fetch product info for each sale detail
+          const productRes = await fetch(API_ENDPOINTS.PRODUCT(detail.product_id));
+          const product = await productRes.json();
+          const categoryCode = product.category_code;
+          const categoryName = categoryMap[categoryCode] || categoryCode;
+          const price = parseFloat(product.price);
+          const saleValue = price * detail.quantity_sold;
+          if (!categoryTotals[categoryName]) {
+            categoryTotals[categoryName] = { name: categoryName, value: 0, code: categoryCode };
+          }
+          categoryTotals[categoryName].value += saleValue;
+        }
+
+        // 5. Map category names/colors and calculate percentages
+        const totalSales = Object.values(categoryTotals).reduce((sum, cat) => sum + cat.value, 0);
+        const categories = Object.entries(categoryTotals).map(([name, cat]) => ({
+          name,
+          value: cat.value,
+          percentage: totalSales ? Number(((cat.value / totalSales) * 100).toFixed(2)) : 0,
+          color: CATEGORY_COLORS[cat.code] || '#8884d8',
+        }));
+        setCategoryData(categories);
+      } catch (err) {
+        // fallback to empty or mock data
+        setCategoryData([]);
+      }
+    };
+    fetchCategoryPerformance();
+  }, [dateRange]);
 
   const formatCurrency = (value) => {
     return new Intl.NumberFormat('en-PH', {
@@ -33,7 +145,7 @@ const CategoryChart = ({ data, title = "Category Performance" }) => {
             Sales: {formatCurrency(data?.value)}
           </p>
           <p className="font-body text-sm text-muted-foreground">
-            Share: {data?.percentage}%
+            Share: {data?.percentage?.toFixed(2)}%
           </p>
         </div>
       );
@@ -58,7 +170,7 @@ const CategoryChart = ({ data, title = "Category Performance" }) => {
         fontWeight="600"
         fontFamily="Source Sans Pro"
       >
-        {`${percentage?.toFixed(1)}%`}
+  {`${percentage?.toFixed(2)}%`}
       </text>
     );
   };
@@ -167,7 +279,7 @@ const CategoryChart = ({ data, title = "Category Performance" }) => {
                     {category?.name}
                   </p>
                   <p className="font-caption text-xs text-muted-foreground">
-                    {category?.percentage}% of total
+                    {category?.percentage?.toFixed(2)}% of total
                   </p>
                 </div>
               </div>

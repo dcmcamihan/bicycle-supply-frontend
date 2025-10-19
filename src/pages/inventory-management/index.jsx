@@ -117,7 +117,7 @@ const InventoryManagement = () => {
             description: '',
             cost: 0,
             stock: quantityOnHand,
-            reorderLevel: 3,
+            reorderLevel: item.reorder_level,
             barcode: '',
             weight: 0,
             dimensions: '',

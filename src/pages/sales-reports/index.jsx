@@ -428,6 +428,7 @@ const SalesReports = () => {
             <CategoryChart 
               data={categoryData} 
               title="Category Performance"
+              dateRange={dateRange}
             />
           </div>
 

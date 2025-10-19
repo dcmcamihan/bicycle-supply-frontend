@@ -155,12 +155,9 @@ const InventoryTable = ({
                 <td className="px-4 py-4">
                   <div className="flex flex-col space-y-1">
                     <div className="flex items-center space-x-2">
-                      {(getStockStatusText(product?.stock, product?.reorderLevel) === 'In Stock' ||
-                        getStockStatusText(product?.stock, product?.reorderLevel) === 'Low Stock') && (
-                        <span className="font-body font-medium text-sm text-foreground">
-                          {product?.stock}
-                        </span>
-                      )}
+                      <span className="font-body font-medium text-sm text-foreground">
+                        {product?.stock}
+                      </span>
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                         getStockStatusColor(product?.stock, product?.reorderLevel)
                       }`}>
