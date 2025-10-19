@@ -34,22 +34,26 @@ const TransactionTable = ({ transactions }) => {
     let filtered = tableTransactions?.filter(transaction => {
       // Safely convert searchTerm to string and handle empty/null cases
       const searchQuery = (searchTerm || '')?.toLowerCase();
-      
+
+      // Case-insensitive payment method filter
+      const transactionPayment = (transaction?.paymentMethod || '').toLowerCase();
+      const filterPaymentLower = (filterPayment || '').toLowerCase();
+
       // If no search term, only apply payment filter
       if (!searchQuery) {
-        const matchesPayment = filterPayment === 'all' || transaction?.paymentMethod === filterPayment;
+        const matchesPayment = filterPaymentLower === 'all' || transactionPayment === filterPaymentLower;
         return matchesPayment;
       }
-      
+
       // Safely convert each field to string before calling toLowerCase
       const matchesSearch = 
         (transaction?.id || '')?.toString()?.toLowerCase()?.includes(searchQuery) ||
         (transaction?.customer || '')?.toString()?.toLowerCase()?.includes(searchQuery) ||
         (transaction?.items || '')?.toString()?.toLowerCase()?.includes(searchQuery) ||
         (transaction?.staff || '')?.toString()?.toLowerCase()?.includes(searchQuery);
-      
-      const matchesPayment = filterPayment === 'all' || transaction?.paymentMethod === filterPayment;
-      
+
+      const matchesPayment = filterPaymentLower === 'all' || transactionPayment === filterPaymentLower;
+
       return matchesSearch && matchesPayment;
     });
 
@@ -252,7 +256,7 @@ const TransactionTable = ({ transactions }) => {
                 </td>
                 <td className="p-4">
                   <span className="font-body text-sm text-foreground">
-                    {transaction?.paymentMethod}
+                    {transaction?.paymentMethod ? transaction.paymentMethod : 'N/A'}
                   </span>
                 </td>
                 <td className="p-4">

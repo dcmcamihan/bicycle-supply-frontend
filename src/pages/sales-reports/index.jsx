@@ -77,7 +77,8 @@ const SalesReports = () => {
 
   // Helper: fetch payment method description
   const getPaymentMethod = async (saleId) => {
-    const payData = await fetchJson(API_ENDPOINTS.SALE_PAYMENT_TYPES(saleId));
+    // Use API_ENDPOINTS for sale payment types
+    const payData = await fetchJson(API_ENDPOINTS.SALE_PAYMENT_TYPES_BY_SALE(saleId));
     let payment_method_code = '';
     if (Array.isArray(payData) && payData.length > 0) {
       payment_method_code = payData[0].payment_method_code || '';
@@ -86,6 +87,7 @@ const SalesReports = () => {
     }
     if (payment_method_code) {
       try {
+        // Use API_ENDPOINTS for payment method description
         const descData = await fetchJson(API_ENDPOINTS.PAYMENT_METHOD(payment_method_code));
         return descData.description || payment_method_code;
       } catch {
@@ -217,8 +219,27 @@ const SalesReports = () => {
           let paymentMethod = '';
           try {
             paymentMethod = await getPaymentMethod(item.sale_id);
+            // Fallback to code if description is missing
+            if (!paymentMethod) {
+              const payData = await fetchJson(API_ENDPOINTS.SALE_PAYMENT_TYPES_BY_SALE(item.sale_id));
+              if (Array.isArray(payData) && payData.length > 0) {
+                paymentMethod = payData[0].payment_method_code || '';
+              } else if (payData.payment_method_code) {
+                paymentMethod = payData.payment_method_code;
+              }
+            }
           } catch {
-            paymentMethod = '';
+            // Fallback to code if fetch fails
+            try {
+              const payData = await fetchJson(API_ENDPOINTS.SALE_PAYMENT_TYPES_BY_SALE(item.sale_id));
+              if (Array.isArray(payData) && payData.length > 0) {
+                paymentMethod = payData[0].payment_method_code || '';
+              } else if (payData.payment_method_code) {
+                paymentMethod = payData.payment_method_code;
+              }
+            } catch {
+              paymentMethod = '';
+            }
           }
           let staffName = '';
           try {

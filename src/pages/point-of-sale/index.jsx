@@ -175,15 +175,90 @@ const PointOfSale = () => {
   };
 
   const handlePaymentComplete = (paymentData) => {
-    setLastTransaction({
-      ...paymentData,
-      items: [...cartItems],
-      customer: selectedCustomer,
-      transactionId: `TXN-${Date.now()}`
-    });
-    setShowPaymentSuccess(true);
-    setCartItems([]);
-    setSelectedCustomer(null);
+    (async () => {
+      // 1. POST Sale
+      const salePayload = {
+        customer_id: selectedCustomer?.id || 1,
+        sale_date: new Date().toISOString(),
+        cashier: 1, // Replace with actual cashier ID if available
+        manager: 13 // Replace with actual manager ID if available
+      };
+      let saleId;
+      // Generate transaction ID now so it can be used as reference_number
+      const transactionId = `TXN-${Date.now()}`;
+      try {
+        // Debug log
+        console.log('POST /api/sales payload:', salePayload);
+        const saleRes = await fetch(API_ENDPOINTS.SALES, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(salePayload)
+        });
+        const saleResText = await saleRes.text();
+        console.log('POST /api/sales response:', saleResText);
+        if (!saleRes.ok) throw new Error('Failed to create sale: ' + saleResText);
+        const saleData = JSON.parse(saleResText);
+        saleId = saleData.sale_id || saleData.id || saleData[0]?.sale_id;
+      } catch (err) {
+        alert('Error creating sale: ' + err.message);
+        return;
+      }
+
+      // 2. POST Sale Details
+      try {
+        for (const item of cartItems) {
+          const saleDetailPayload = {
+            sale_id: saleId,
+            product_id: item.id,
+            quantity_sold: item.quantity
+          };
+          console.log('POST /api/sale-details payload:', saleDetailPayload);
+          const saleDetailsRes = await fetch('http://localhost:3000/api/sale-details', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(saleDetailPayload)
+          });
+          const saleDetailsResText = await saleDetailsRes.text();
+          console.log('POST /api/sale-details response:', saleDetailsResText);
+          if (!saleDetailsRes.ok) throw new Error('Failed to create sale details: ' + saleDetailsResText);
+        }
+      } catch (err) {
+        alert('Error creating sale details: ' + err.message);
+        return;
+      }
+
+      // 3. POST Sale Payment Type
+      try {
+        const paymentTypePayload = {
+          sale_id: saleId,
+          payment_method_code: (paymentData.method || 'CASH').toUpperCase(),
+          reference_number: transactionId
+        };
+        console.log('POST /api/sale-payment-types payload:', paymentTypePayload);
+        const paymentTypeRes = await fetch(API_ENDPOINTS.SALE_PAYMENT_TYPES, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(paymentTypePayload)
+        });
+        const paymentTypeResText = await paymentTypeRes.text();
+        console.log('POST /api/sale-payment-types response:', paymentTypeResText);
+        if (!paymentTypeRes.ok) throw new Error('Failed to create sale payment type: ' + paymentTypeResText);
+      } catch (err) {
+        alert('Error creating sale payment type: ' + err.message);
+        return;
+      }
+
+      // 4. Show payment success
+      setLastTransaction({
+        ...paymentData,
+        items: [...cartItems],
+        customer: selectedCustomer,
+        transactionId
+      });
+      setShowPaymentSuccess(true);
+      setCartItems([]);
+      setSelectedCustomer(null);
+    })();
   };
 
   const handleNewTransaction = () => {
