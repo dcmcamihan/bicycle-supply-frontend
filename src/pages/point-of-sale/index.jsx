@@ -440,8 +440,8 @@ const PointOfSale = () => {
                     onCustomerSelect={handleCustomerSelect}
                     onCustomerClear={handleCustomerClear}
                   />
-                  
-                  <div className="h-96">
+
+                  <div className="h-[32rem]">
                     <ShoppingCart
                       cartItems={cartItems}
                       onUpdateQuantity={handleUpdateQuantity}
@@ -449,7 +449,7 @@ const PointOfSale = () => {
                       onClearCart={handleClearCart}
                     />
                   </div>
-                  
+
                   <PaymentMethods
                     total={cartTotal}
                     onPaymentComplete={handlePaymentComplete}

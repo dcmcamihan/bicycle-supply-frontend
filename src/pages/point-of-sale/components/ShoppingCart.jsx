@@ -54,7 +54,7 @@ const ShoppingCart = ({ cartItems, onUpdateQuantity, onRemoveItem, onClearCart }
                 <div className="flex items-start space-x-3">
                   <div className="w-12 h-12 overflow-hidden rounded-md bg-background flex-shrink-0">
                     <Image
-                      src={item?.image}
+                      src={item?.image_url}
                       alt={item?.name}
                       className="w-full h-full object-cover"
                     />
