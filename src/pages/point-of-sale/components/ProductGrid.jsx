@@ -48,7 +48,7 @@ const ProductGrid = ({ products, onAddToCart, loading }) => {
                 >
                   <div className="aspect-square mb-3 overflow-hidden rounded-md bg-background">
                     <Image
-                      src={product?.image}
+                      src={product?.image_url}
                       alt={product?.name}
                       className="w-full h-full object-cover"
                     />

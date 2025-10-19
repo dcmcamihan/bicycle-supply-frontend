@@ -126,6 +126,7 @@ const InventoryManagement = () => {
             material: '',
             warranty: '',
             image: '',
+            image_url: item.image_url || '',
             lastUpdated: '',
             isActive: true,
             trackInventory: true

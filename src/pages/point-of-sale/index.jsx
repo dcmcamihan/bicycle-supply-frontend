@@ -70,7 +70,7 @@ const PointOfSale = () => {
               price: parseFloat(item.price),
               category: item.category_code,
               brand_id: item.brand_id,
-              image: 'https://images.unsplash.com/photo-1519125323398-675f0ddb6308?w=400&h=400&fit=crop',
+              image_url: item.image_url || '',
               stock
             };
           })

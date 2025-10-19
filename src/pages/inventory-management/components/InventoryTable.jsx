@@ -127,7 +127,7 @@ const InventoryTable = ({
                   <div className="flex items-center space-x-3">
                     <div className="w-12 h-12 bg-muted rounded-lg overflow-hidden flex-shrink-0">
                       <Image
-                        src={product?.image}
+                        src={product?.image_url || product?.image}
                         alt={product?.name}
                         className="w-full h-full object-cover"
                       />
