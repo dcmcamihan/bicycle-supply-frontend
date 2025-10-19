@@ -1,36 +1,44 @@
 import React, { useState } from 'react';
+import API_ENDPOINTS from '../../../config/api';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 
 const PaymentMethods = ({ total, onPaymentComplete, disabled }) => {
   const [selectedMethod, setSelectedMethod] = useState(null);
-  // Discount codes removed
   const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentMethods, setPaymentMethods] = useState([]);
 
-  const paymentMethods = [
-    {
-      id: 'cash',
-      name: 'Cash',
-      icon: 'Banknote',
-      color: 'text-success',
-      bgColor: 'bg-success/10'
-    },
-    {
-      id: 'card',
-      name: 'Card',
-      icon: 'CreditCard',
-      color: 'text-primary',
-      bgColor: 'bg-primary/10'
-    },
-    {
-      id: 'digital',
-      name: 'Digital',
-      icon: 'Smartphone',
-      color: 'text-accent',
-      bgColor: 'bg-accent/10'
-    }
-  ];
+  React.useEffect(() => {
+    const fetchPaymentMethods = async () => {
+      try {
+        const res = await fetch(API_ENDPOINTS.PAYMENT_METHODS);
+        if (!res.ok) throw new Error('Failed to fetch payment methods');
+        const data = await res.json();
+        const bgColors = ['bg-success/10', 'bg-primary/10', 'bg-accent/10', 'bg-secondary/10', 'bg-muted/10'];
+        const textColors = ['text-success', 'text-primary', 'text-accent', 'text-secondary', 'text-muted-foreground'];
+        const shuffledBgColors = bgColors.sort(() => Math.random() - 0.5);
+        const shuffledTextColors = textColors.sort(() => Math.random() - 0.5);
+
+        setPaymentMethods(data.map((pm, idx) => {
+          const colorIdx = idx % shuffledBgColors.length;
+          const textColorIdx = idx % shuffledTextColors.length;
+          return {
+            ...pm,
+            id: pm.payment_method_code,
+            name: pm.name,
+            description: pm.description,
+            icon: pm.icon,
+            bgColor: shuffledBgColors[colorIdx],
+            iconColor: shuffledTextColors[textColorIdx]
+          };
+        }));
+      } catch {
+        setPaymentMethods([]);
+      }
+    };
+    fetchPaymentMethods();
+  }, []);
 
   // Discount codes removed
 
@@ -53,7 +61,7 @@ const PaymentMethods = ({ total, onPaymentComplete, disabled }) => {
     setTimeout(() => {
       const finalAmount = calculateDiscountedTotal();
       onPaymentComplete({
-        method: method?.name,
+        method: method?.payment_method_code,
         amount: finalAmount,
         discount: null,
         timestamp: new Date()?.toISOString()
@@ -90,20 +98,18 @@ const PaymentMethods = ({ total, onPaymentComplete, disabled }) => {
             disabled={disabled || total === 0}
             loading={isProcessing && selectedMethod?.id === method?.id}
             onClick={() => handlePayment(method)}
-            className="justify-start h-16"
+            className="justify-start h-16 hover:bg-orange-100"
           >
             <div className="flex items-center space-x-4">
               <div className={`w-12 h-12 rounded-lg ${method?.bgColor} flex items-center justify-center`}>
-                <Icon name={method?.icon} size={24} className={method?.color} />
+                <Icon name={method?.icon} size={24} className={method?.iconColor} />
               </div>
               <div className="text-left">
                 <div className="font-body font-semibold text-foreground">
                   Pay with {method?.name}
                 </div>
                 <div className="font-caption text-xs text-muted-foreground">
-                  {method?.name === 'Cash' && 'Accept cash payment'}
-                  {method?.name === 'Card' && 'Credit/Debit card'}
-                  {method?.name === 'Digital' && 'Mobile payments'}
+                  {method?.description}
                 </div>
               </div>
             </div>

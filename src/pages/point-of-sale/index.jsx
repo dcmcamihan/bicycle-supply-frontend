@@ -14,6 +14,22 @@ import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
 
 const PointOfSale = () => {
+  // Payment methods from API
+  const [paymentMethods, setPaymentMethods] = useState([]);
+
+  useEffect(() => {
+    const fetchPaymentMethods = async () => {
+      try {
+        const res = await fetch(API_ENDPOINTS.PAYMENT_METHODS || 'http://localhost:3000/api/payment-methods');
+        if (!res.ok) throw new Error('Failed to fetch payment methods');
+        const data = await res.json();
+        setPaymentMethods(data);
+      } catch {
+        setPaymentMethods([]);
+      }
+    };
+    fetchPaymentMethods();
+  }, []);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
@@ -229,9 +245,19 @@ const PointOfSale = () => {
 
       // 3. POST Sale Payment Type
       try {
+        // Map payment method label to code
+        let paymentMethodCode = 'CASH';
+        if (paymentData.method) {
+          // Find code by label (case-insensitive)
+          const found = paymentMethods.find(pm => pm.description?.toLowerCase() === paymentData.method.toLowerCase() || pm.payment_method_code?.toLowerCase() === paymentData.method.toLowerCase());
+          paymentMethodCode = found?.payment_method_code || paymentData.method.toUpperCase();
+        }
+        // Debug: log all available codes and the one being sent
+        console.log('Available payment method codes:', paymentMethods.map(pm => pm.payment_method_code));
+        console.log('Selected payment method code:', paymentMethodCode);
         const paymentTypePayload = {
           sale_id: saleId,
-          payment_method_code: (paymentData.method || 'CASH').toUpperCase(),
+          payment_method_code: paymentMethodCode,
           reference_number: transactionId
         };
         console.log('POST /api/sale-payment-types payload:', paymentTypePayload);

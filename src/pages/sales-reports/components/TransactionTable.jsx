@@ -3,6 +3,7 @@ import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
+import API_ENDPOINTS from '../../../config/api';
 
 const TransactionTable = ({ transactions }) => {
   // Reset all filters and pagination when transactions change
@@ -22,13 +23,27 @@ const TransactionTable = ({ transactions }) => {
 
   const tableTransactions = transactions || [];
 
-  const paymentMethodOptions = [
-    { value: 'all', label: 'All Payment Methods' },
-    { value: 'Credit Card', label: 'Credit Card' },
-    { value: 'Debit Card', label: 'Debit Card' },
-    { value: 'Cash', label: 'Cash' },
-    { value: 'E-Wallet Payment', label: 'E-Wallet Payment (Digital Wallet)' }
-  ];
+  const [paymentMethodOptions, setPaymentMethodOptions] = useState([
+    { value: 'all', label: 'All Payment Methods' }
+  ]);
+
+  React.useEffect(() => {
+    const fetchPaymentMethods = async () => {
+      try {
+        const res = await fetch(API_ENDPOINTS.PAYMENT_METHODS);
+        if (!res.ok) throw new Error('Failed to fetch payment methods');
+        const data = await res.json();
+        const options = [
+          { value: 'all', label: 'All Payment Methods' },
+          ...data.map(pm => ({ value: pm.name, label: pm.name }))
+        ];
+        setPaymentMethodOptions(options);
+      } catch {
+        setPaymentMethodOptions([{ value: 'all', label: 'All Payment Methods' }]);
+      }
+    };
+    fetchPaymentMethods();
+  }, []);
 
   const filteredAndSortedTransactions = useMemo(() => {
     let filtered = tableTransactions?.filter(transaction => {

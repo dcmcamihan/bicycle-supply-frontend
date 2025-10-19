@@ -9,7 +9,7 @@ export const API_ENDPOINTS = {
   // Sales
   SALES: `${API_BASE_URL}/sales`,
   SALE_DETAILS: (saleId) => `${API_BASE_URL}/sale-details/sale/${saleId}`,
-  
+
   // Sale Payment Types
   SALE_PAYMENT_TYPES: `${API_BASE_URL}/sale-payment-types`, // GET all, POST new
   SALE_PAYMENT_TYPE: (code) => `${API_BASE_URL}/sale-payment-types/${code}`,
@@ -22,6 +22,7 @@ export const API_ENDPOINTS = {
   EMPLOYEE: (employeeId) => `${API_BASE_URL}/employees/${employeeId}`,
 
   // Payment Methods
+  PAYMENT_METHODS: `${API_BASE_URL}/payment-methods`, // GET all
   PAYMENT_METHOD: (code) => `${API_BASE_URL}/payment-methods/${code}`,
 
   // Brands

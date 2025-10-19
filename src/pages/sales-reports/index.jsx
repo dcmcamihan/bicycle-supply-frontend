@@ -87,9 +87,9 @@ const SalesReports = () => {
     }
     if (payment_method_code) {
       try {
-        // Use API_ENDPOINTS for payment method description
-        const descData = await fetchJson(API_ENDPOINTS.PAYMENT_METHOD(payment_method_code));
-        return descData.description || payment_method_code;
+        // Use API_ENDPOINTS for payment method name
+        const paymentMethodName = await fetchJson(API_ENDPOINTS.PAYMENT_METHOD(payment_method_code));
+        return paymentMethodName.name || payment_method_code;
       } catch {
         return payment_method_code;
       }
