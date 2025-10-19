@@ -38,7 +38,7 @@ const ProductGrid = ({ products, onAddToCart, loading }) => {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-96 overflow-y-auto">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-[38rem] min-h-[24rem] overflow-y-auto">
             {Array.isArray(products) && products.map((product) => {
               const stockStatus = getStockStatus(product?.stock);
               return (
