@@ -1,3 +1,4 @@
+import API_ENDPOINTS from '../../../config/api';
 import React, { useState } from 'react';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
@@ -14,21 +15,37 @@ const ProductInfoTabs = ({ product, isEditing, onToggleEdit, onSave }) => {
     { id: 'supplier', label: 'Supplier', icon: 'Truck' }
   ];
 
-  const categoryOptions = [
-    { value: 'mountain', label: 'Mountain Bikes' },
-    { value: 'road', label: 'Road Bikes' },
-    { value: 'hybrid', label: 'Hybrid Bikes' },
-    { value: 'electric', label: 'Electric Bikes' },
-    { value: 'bmx', label: 'BMX Bikes' }
-  ];
+  const [categoryOptions, setCategoryOptions] = useState([]);
 
-  const brandOptions = [
-    { value: 'trek', label: 'Trek' },
-    { value: 'specialized', label: 'Specialized' },
-    { value: 'giant', label: 'Giant' },
-    { value: 'cannondale', label: 'Cannondale' },
-    { value: 'scott', label: 'Scott' }
-  ];
+  React.useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const res = await fetch(API_ENDPOINTS.CATEGORIES);
+        if (!res.ok) throw new Error('Failed to fetch categories');
+        const data = await res.json();
+        setCategoryOptions(data.map(c => ({ value: c.category_code, label: c.category_name })));
+      } catch {
+        setCategoryOptions([]);
+      }
+    };
+    fetchCategories();
+  }, []);
+
+  const [brandOptions, setBrandOptions] = useState([]);
+
+  React.useEffect(() => {
+    const fetchBrands = async () => {
+      try {
+        const res = await fetch(API_ENDPOINTS.BRANDS);
+        if (!res.ok) throw new Error('Failed to fetch brands');
+        const data = await res.json();
+        setBrandOptions(data.map(b => ({ value: b.brand_id, label: b.brand_name })));
+      } catch {
+        setBrandOptions([]);
+      }
+    };
+    fetchBrands();
+  }, []);
 
   const handleInputChange = (field, value) => {
     setEditedProduct(prev => ({
