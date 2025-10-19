@@ -30,19 +30,19 @@ const ProductHeader = ({ product, isEditing, onToggleEdit, onDuplicate, onDelete
                 <div className="flex items-center space-x-2">
                   <Icon name="Hash" size={16} className="text-muted-foreground" />
                   <span className="text-sm font-body text-muted-foreground">SKU:</span>
-                  <span className="text-sm font-data text-foreground">{product?.sku}</span>
+                  <span className="text-sm font-data text-foreground">{product?.id}</span>
                 </div>
                 
                 <div className="flex items-center space-x-2">
                   <Icon name="Tag" size={16} className="text-muted-foreground" />
                   <span className="text-sm font-body text-muted-foreground">Category:</span>
-                  <span className="text-sm font-body text-foreground capitalize">{product?.category}</span>
+                  <span className="text-sm font-body text-foreground capitalize">{product?.category_name || product?.category}</span>
                 </div>
                 
                 <div className="flex items-center space-x-2">
                   <Icon name="Building" size={16} className="text-muted-foreground" />
                   <span className="text-sm font-body text-muted-foreground">Brand:</span>
-                  <span className="text-sm font-body text-foreground capitalize">{product?.brand}</span>
+                  <span className="text-sm font-body text-foreground capitalize">{product?.brand_name || product?.brand}</span>
                 </div>
               </div>
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import API_ENDPOINTS from '../../config/api';
 import Header from '../../components/ui/Header';
 import Sidebar from '../../components/ui/Sidebar';
 import Breadcrumb from '../../components/ui/Breadcrumb';
@@ -17,10 +18,14 @@ const ProductDetails = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [showMobileActions, setShowMobileActions] = useState(false);
 
-  // Mock product data - in real app this would come from API/props
-  const [product, setProduct] = useState({
-    id: 'BIKE-001',
-    name: 'Trek Mountain Explorer Pro 29"',
+  // Get id from URL query params
+  const searchParams = new URLSearchParams(location.search);
+  const productId = searchParams.get('id');
+
+  // Default/mock product data for fallback/extra fields
+  const defaultProduct = {
+    id: productId || 'BIKE-001',
+    name: `Trek Mountain Explorer Pro 29"`,
     sku: 'TRK-MTE-29-BLK',
     category: 'mountain',
     brand: 'trek',
@@ -41,7 +46,72 @@ const ProductDetails = () => {
       name: 'BikeWorld Distributors',code: 'BWD-001',contact: 'Sarah Johnson',phone: '+1 (555) 123-4567',email: 'orders@bikeworld.com'
     },
     createdAt: '2024-11-15',updatedAt: '2025-01-20'
-  });
+  };
+
+  const [product, setProduct] = useState(defaultProduct);
+
+  useEffect(() => {
+    const fetchProduct = async () => {
+      if (!productId) return;
+      try {
+        const res = await fetch(API_ENDPOINTS.PRODUCT(productId));
+        if (!res.ok) throw new Error('Failed to fetch product');
+        const data = await res.json();
+
+        // Fetch category name from categories API
+        let categoryName = '';
+        if (data.category_code) {
+          try {
+            const catRes = await fetch(API_ENDPOINTS.CATEGORY(data.category_code));
+            if (catRes.ok) {
+              const catData = await catRes.json();
+              categoryName = catData.category_name || '';
+            }
+          } catch {}
+        }
+
+        // Fetch brand name from brands API
+        let brandName = '';
+        if (data.brand_id) {
+          try {
+            const brandRes = await fetch(API_ENDPOINTS.BRAND(data.brand_id));
+            if (brandRes.ok) {
+              const brandData = await brandRes.json();
+              brandName = brandData.brand_name || '';
+            }
+          } catch {}
+        }
+
+        setProduct(prev => ({
+          ...prev,
+          ...defaultProduct,
+          ...{
+            id: data.product_id ?? prev.id,
+            name: data.product_name ?? prev.name,
+            sku: data.product_id ?? prev.sku,
+            description: data.description ?? prev.description,
+            barcode: data.barcode ?? prev.barcode,
+            category: data.category_code ?? prev.category,
+            category_name: categoryName,
+            brand: data.brand_id ?? prev.brand,
+            brand_name: brandName,
+            price: data.price ? parseFloat(data.price) : prev.price,
+            reorderPoint: data.reorder_level ?? prev.reorderPoint,
+            weight: data.weight ?? prev.weight,
+            size: data.size ?? prev.size,
+            color: data.color ?? prev.color,
+            material: data.material ?? prev.material,
+            warranty: data.warranty_period ?? prev.warranty,
+            image: data.image_url ?? prev.image,
+          }
+        }));
+      } catch (err) {
+        // Optionally show error or fallback
+      }
+    };
+    fetchProduct();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productId]);
 
   const handleSidebarToggle = () => {
     setIsSidebarCollapsed(!isSidebarCollapsed);

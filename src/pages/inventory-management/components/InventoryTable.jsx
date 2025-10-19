@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Icon from '../../../components/AppIcon';
 import Image from '../../../components/AppImage';
 import Button from '../../../components/ui/Button';
@@ -15,6 +16,8 @@ const InventoryTable = ({
   sortConfig,
   onSort 
 }) => {
+  const navigate = useNavigate();
+
   React.useEffect(() => {
     // eslint-disable-next-line no-console
     console.log('[InventoryTable] mounted. products:', products);
@@ -133,9 +136,14 @@ const InventoryTable = ({
                       />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="font-body font-medium text-sm text-foreground truncate">
+                      <button
+                        className="font-body font-medium text-sm text-primary underline underline-offset-2 hover:text-primary/80 truncate text-left bg-transparent border-0 p-0 cursor-pointer"
+                        onClick={() => navigate(`/product-details?id=${product?.id}`)}
+                        title={product?.name}
+                        type="button"
+                      >
                         {product?.name}
-                      </p>
+                      </button>
                       <p className="font-caption text-xs text-muted-foreground truncate">
                         {product?.brand}
                       </p>

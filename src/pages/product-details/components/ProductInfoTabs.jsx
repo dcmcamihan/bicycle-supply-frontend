@@ -8,6 +8,12 @@ import Select from '../../../components/ui/Select';
 const ProductInfoTabs = ({ product, isEditing, onToggleEdit, onSave }) => {
   const [activeTab, setActiveTab] = useState('general');
   const [editedProduct, setEditedProduct] = useState(product);
+  const [categoryLabel, setCategoryLabel] = useState('');
+
+  // Sync editedProduct with product only when product changes, not on every render or edit toggle
+  React.useEffect(() => {
+    setEditedProduct(product);
+  }, [product]);
 
   const tabs = [
     { id: 'general', label: 'General Info', icon: 'Info' },
@@ -24,12 +30,19 @@ const ProductInfoTabs = ({ product, isEditing, onToggleEdit, onSave }) => {
         if (!res.ok) throw new Error('Failed to fetch categories');
         const data = await res.json();
         setCategoryOptions(data.map(c => ({ value: c.category_code, label: c.category_name })));
+        // Set the label for the current product's category
+        if (product.category_name) {
+          setCategoryLabel(product.category_name);
+        } else {
+          const found = data.find(c => c.category_code === (product.category || product.category_code));
+          setCategoryLabel(found ? found.category_name : (product.category || ''));
+        }
       } catch {
         setCategoryOptions([]);
       }
     };
     fetchCategories();
-  }, []);
+  }, [product.category, product.category_code, product.category_name]);
 
   const [brandOptions, setBrandOptions] = useState([]);
 
@@ -46,6 +59,17 @@ const ProductInfoTabs = ({ product, isEditing, onToggleEdit, onSave }) => {
     };
     fetchBrands();
   }, []);
+
+  // Set the label for the current product's brand
+  const [brandLabel, setBrandLabel] = React.useState('');
+  React.useEffect(() => {
+    if (product.brand_name) {
+      setBrandLabel(product.brand_name);
+    } else if (brandOptions.length > 0) {
+      const found = brandOptions.find(b => b.value === (product.brand || product.brand_id));
+      setBrandLabel(found ? found.label : (product.brand || ''));
+    }
+  }, [product.brand, product.brand_id, product.brand_name, brandOptions]);
 
   const handleInputChange = (field, value) => {
     setEditedProduct(prev => ({
@@ -72,30 +96,48 @@ const ProductInfoTabs = ({ product, isEditing, onToggleEdit, onSave }) => {
         <Input
           label="SKU"
           type="text"
-          value={editedProduct.sku}
-          onChange={(e) => handleInputChange('sku', e.target.value)}
+          value={editedProduct.id}
+          onChange={(e) => handleInputChange('id', e.target.value)}
           disabled={!isEditing}
           required
         />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Select
-          label="Category"
-          options={categoryOptions}
-          value={editedProduct.category}
-          onChange={(value) => handleInputChange('category', value)}
-          disabled={!isEditing}
-          required
-        />
-        <Select
-          label="Brand"
-          options={brandOptions}
-          value={editedProduct.brand}
-          onChange={(value) => handleInputChange('brand', value)}
-          disabled={!isEditing}
-          required
-        />
+        {isEditing ? (
+          <Select
+            label="Category"
+            options={categoryOptions}
+            value={editedProduct.category}
+            onChange={(value) => handleInputChange('category', value)}
+            disabled={!isEditing}
+            required
+          />
+        ) : (
+          <Input
+            label="Category"
+            type="text"
+            value={categoryLabel}
+            disabled
+          />
+        )}
+        {isEditing ? (
+          <Select
+            label="Brand"
+            options={brandOptions}
+            value={editedProduct.brand}
+            onChange={(value) => handleInputChange('brand', value)}
+            disabled={!isEditing}
+            required
+          />
+        ) : (
+          <Input
+            label="Brand"
+            type="text"
+            value={brandLabel}
+            disabled
+          />
+        )}
       </div>
 
       
