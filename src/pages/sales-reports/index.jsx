@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import ExcelJS from 'exceljs';
 import API_ENDPOINTS from '../../config/api';
 import Header from '../../components/ui/Header';
 import Sidebar from '../../components/ui/Sidebar';
@@ -459,18 +462,445 @@ const SalesReports = () => {
 
   const handleExportPDF = async () => {
     setIsLoading(true);
-    // Simulate export process
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    console.log('Exporting PDF report...');
-    setIsLoading(false);
+    try {
+      const now = new Date();
+      const yyyymmdd = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
+      const fileName = `Reports${yyyymmdd}.pdf`;
+
+      const { start, end } = getDateRangeBounds(dateRange);
+      const dateLabel = `${start.toISOString().split('T')[0]} to ${end.toISOString().split('T')[0]}`;
+
+      const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const margin = 40;
+      const usable = pageWidth - margin * 2;
+      const commonTableOpts = {
+        theme: 'grid',
+        styles: { fontSize: 9, cellPadding: 4, overflow: 'linebreak' },
+        headStyles: { fillColor: [37, 99, 235] },
+        margin: { left: margin, right: margin },
+        tableWidth: usable,
+        columnStyles: {}
+      };
+
+      // Title
+      doc.setFontSize(18);
+      doc.text('Sales Summary Report', 40, 40);
+      doc.setFontSize(11);
+      doc.text(`Date Range: ${dateLabel}`, 40, 60);
+      doc.text(`Report Type: ${reportType}`, 40, 76);
+
+      // Executive Summary (concise, peso-only values)
+      const kpiMap = Object.fromEntries(kpiData.map(k => [k.title, k]));
+      autoTable(doc, {
+        startY: 96,
+        head: [['Executive Summary', 'Value']],
+        body: [
+          ['Total Sales', `₱${Number(kpiMap['Total Sales']?.value||0).toLocaleString()}`],
+          ['Transactions', Number(kpiMap['Transactions']?.value||0).toLocaleString()],
+          ['Average Order', `₱${Number(kpiMap['Average Order']?.value||0).toLocaleString()}`]
+        ],
+        ...commonTableOpts,
+        styles: { ...commonTableOpts.styles, fontSize: 10 },
+        columnStyles: { 0: { cellWidth: 200 }, 1: { cellWidth: 240 } },
+      });
+
+      // Section 1: Sales by Day (last 7 days)
+      autoTable(doc, {
+        startY: doc.lastAutoTable.finalY + 18,
+        head: [['1) Sales by Day', 'Sales', 'Transactions', 'Avg Order']],
+        body: (salesChartData||[]).map(d => [d.name, `₱${Number(d.sales||0).toLocaleString()}`,
+          Number(d.transactions||0).toLocaleString(), `₱${Number(d.avgOrder||0).toLocaleString()}`]),
+        ...commonTableOpts,
+        columnStyles: { 0: { cellWidth: 140 }, 1: { cellWidth: 120 }, 2: { cellWidth: 120 }, 3: { cellWidth: 120 } }
+      });
+
+      // Section 2: Top Products
+      if (bestSellers?.length) {
+        autoTable(doc, {
+          startY: doc.lastAutoTable.finalY + 20,
+          head: [['2) Top Products', 'Quantity', 'Sales']],
+          body: bestSellers.map(p => [p.name, Number(p.quantity||0).toLocaleString(), `₱${Number(p.sales||0).toLocaleString()}`]),
+          ...commonTableOpts,
+          columnStyles: { 0: { cellWidth: 220 }, 1: { cellWidth: 80 }, 2: { cellWidth: 120 } }
+        });
+      }
+
+      // Section 3: Category Performance
+      if (Array.isArray(categoryData) && categoryData.length) {
+        autoTable(doc, {
+          startY: doc.lastAutoTable.finalY + 20,
+          head: [['3) Category Performance', 'Sales', 'Share %']],
+          body: categoryData.map(c => [c.name, `₱${Number(c.value||0).toLocaleString()}`, `${Number(c.percentage||0).toFixed(1)}%`]),
+          ...commonTableOpts,
+          columnStyles: { 0: { cellWidth: 220 }, 1: { cellWidth: 120 }, 2: { cellWidth: 80 } }
+        });
+      }
+
+      // Section 4: Payment Distribution
+      if (paymentDistribution?.length) {
+        autoTable(doc, {
+          startY: doc.lastAutoTable.finalY + 20,
+          head: [['4) Payment Distribution', 'Transactions', 'Amount']],
+          body: paymentDistribution.map(p => [p.method, Number(p.count||0).toLocaleString(), `₱${Number(p.amount||0).toLocaleString()}`]),
+          ...commonTableOpts,
+          columnStyles: { 0: { cellWidth: 220 }, 1: { cellWidth: 100 }, 2: { cellWidth: 120 } }
+        });
+      }
+
+      // Section 5: Staff Performance
+      if (staffPerformance?.length) {
+        autoTable(doc, {
+          startY: doc.lastAutoTable.finalY + 20,
+          head: [['5) Staff Performance', 'Transactions', 'Amount']],
+          body: staffPerformance.map(s => [s.staff, Number(s.count||0).toLocaleString(), `₱${Number(s.amount||0).toLocaleString()}`]),
+          ...commonTableOpts,
+          columnStyles: { 0: { cellWidth: 220 }, 1: { cellWidth: 100 }, 2: { cellWidth: 120 } }
+        });
+      }
+
+      // Section 6: Peak Hours
+      if (peakHours?.length) {
+        autoTable(doc, {
+          startY: doc.lastAutoTable.finalY + 20,
+          head: [['6) Peak Hours', 'Transactions', 'Amount']],
+          body: peakHours.map(h => [`${String(h.hour).padStart(2,'0')}:00`, Number(h.count||0).toLocaleString(), `₱${Number(h.amount||0).toLocaleString()}`]),
+          ...commonTableOpts,
+          columnStyles: { 0: { cellWidth: 100 }, 1: { cellWidth: 120 }, 2: { cellWidth: 120 } }
+        });
+      }
+
+      // Section 7: Transactions (top 25 by amount for clarity)
+      const topTx = [...(transactionsData||[])].sort((a,b) => (b.amount||0) - (a.amount||0)).slice(0, 25);
+      autoTable(doc, {
+        startY: doc.lastAutoTable ? doc.lastAutoTable.finalY + 20 : 120,
+        head: [['7) Top Transactions', 'Customer', 'Items', 'Amount', 'Payment', 'Staff']],
+        body: topTx.map(t => [t.date, t.customer, Number(t.items||0).toLocaleString(), `₱${Number(t.amount||0).toLocaleString()}`, t.paymentMethod, t.staff]),
+        ...commonTableOpts,
+        columnStyles: { 0: { cellWidth: 90 }, 1: { cellWidth: 170 }, 2: { cellWidth: 70 }, 3: { cellWidth: 110 }, 4: { cellWidth: 110 }, 5: { cellWidth: 120 } },
+        didDrawPage: (data) => {
+          // Footer page numbers
+          const str = `Page ${doc.internal.getNumberOfPages()}`;
+          doc.setFontSize(9);
+          doc.text(str, data.settings.margin.left, doc.internal.pageSize.height - 10);
+        }
+      });
+
+      // Final: Insights / Narrative Summary (clear takeaways)
+      const summaryY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 20 : 100;
+      doc.setFontSize(12);
+      doc.text('Insights', 40, summaryY);
+      doc.setFontSize(10);
+      const insights = [
+        'Focus on days and hours with strong performance to schedule staff and promotions.',
+        'Replenish inventory for best sellers and strong categories; consider bundling popular items.',
+        'Ensure payment options align with customer preferences shown in distribution.',
+      ];
+      let y = summaryY + 16;
+      insights.forEach(line => { doc.text(`• ${line}`, 46, y); y += 14; });
+
+      doc.save(fileName);
+    } catch (e) {
+      console.error('Failed to export PDF:', e);
+      alert('Failed to export PDF. Please ensure export libraries are installed.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleExportExcel = async () => {
     setIsLoading(true);
-    // Simulate export process
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    console.log('Exporting Excel report...');
-    setIsLoading(false);
+    try {
+      const now = new Date();
+      const yyyymmdd = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
+      const fileName = `Reports${yyyymmdd}.xlsx`;
+      const workbook = new ExcelJS.Workbook();
+      const { start, end } = getDateRangeBounds(dateRange);
+      const dateLabel = `${start.toISOString().split('T')[0]} to ${end.toISOString().split('T')[0]}`;
+
+      // Helper to add a header
+      const addHeader = (ws, title) => {
+        const r1 = ws.addRow([title]);
+        const r2 = ws.addRow([`Date Range: ${dateLabel}`, `Report Type: ${reportType}`]);
+        ws.addRow([]);
+        // Style header
+        [r1, r2].forEach(r => {
+          r.font = { bold: true, color: { argb: 'FF111827' } };
+        });
+      };
+
+      const styleTableHeader = (row) => {
+        row.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } };
+      };
+
+      const applyZebra = (ws, startRow) => {
+        for (let i = startRow; i <= ws.rowCount; i++) {
+          if ((i - startRow) % 2 === 1) {
+            ws.getRow(i).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+          }
+        }
+      };
+
+      // Helpers for Excel styling
+      const autoFit = (ws) => {
+        const colCount = Math.max(...ws._rows.map(r => r ? r.cellCount : 0));
+        for (let i = 1; i <= colCount; i++) {
+          let max = 10;
+          ws.eachRow((row) => {
+            const cell = row.getCell(i);
+            const v = cell.value == null ? '' : String(typeof cell.value === 'object' && cell.value.richText ? cell.value.richText.map(t=>t.text).join('') : cell.value);
+            max = Math.max(max, v.length + 2);
+          });
+          ws.getColumn(i).width = Math.max(10, Math.min(30, max));
+        }
+      };
+      const applyCurrency = (ws, headerRow) => {
+        const hdr = ws.getRow(headerRow);
+        hdr.eachCell((cell, col) => {
+          const name = String(cell.value||'').toLowerCase();
+          if (name.includes('sales') || name.includes('amount') || name.includes('avg') || name.includes('order')) {
+            for (let r = headerRow + 1; r <= ws.rowCount; r++) {
+              const c = ws.getRow(r).getCell(col);
+              if (typeof c.value === 'number') c.numFmt = '[$₱-en-PH]#,##0.00';
+            }
+          }
+        });
+      };
+      const styleBigHeader = (ws, title) => {
+        const r1 = ws.addRow([title]);
+        r1.font = { bold: true, size: 16, color: { argb: 'FF111827' } };
+        r1.height = 28;
+        const r2 = ws.addRow([`Date Range: ${dateLabel}`, `Report Type: ${reportType}`]);
+        r2.font = { bold: true, size: 12, color: { argb: 'FF111827' } };
+        r2.height = 22;
+        ws.addRow([]);
+      };
+      const addTable = (ws, headers, rows) => {
+        const hdr = ws.addRow(headers);
+        styleTableHeader(hdr);
+        rows.forEach(r => ws.addRow(r));
+        // borders
+        const start = hdr.number; const end = ws.rowCount; const cols = headers.length;
+        for (let r = start; r <= end; r++) {
+          const row = ws.getRow(r);
+          for (let c = 1; c <= cols; c++) {
+            const cell = row.getCell(c);
+            cell.border = { top: {style: 'thin', color:{argb:'FFE5E7EB'}}, left:{style:'thin', color:{argb:'FFE5E7EB'}}, bottom:{style:'thin', color:{argb:'FFE5E7EB'}}, right:{style:'thin', color:{argb:'FFE5E7EB'}} };
+          }
+        }
+        return hdr.number;
+      };
+
+      // Individual sheets per detail
+      // Summary
+      const wsSummary = workbook.addWorksheet('Summary');
+      styleBigHeader(wsSummary, 'Summary');
+      const sumHdr = addTable(wsSummary, ['Metric','Value'], kpiData.map(k=>[k.title, Number(k.value||0)]));
+      applyCurrency(wsSummary, sumHdr);
+      wsSummary.views = [{ state: 'frozen', ySplit: sumHdr }];
+      autoFit(wsSummary);
+      applyZebra(wsSummary, sumHdr + 1);
+
+      // SalesByDay
+      const wsSales = workbook.addWorksheet('SalesByDay');
+      styleBigHeader(wsSales, 'Sales by Day');
+      const sHdr = addTable(wsSales, ['Day','Sales','Transactions','Avg Order'], (salesChartData||[]).map(d=>[d.name, Number(d.sales||0), Number(d.transactions||0), Number(d.avgOrder||0)]));
+      applyCurrency(wsSales, sHdr);
+      wsSales.views = [{ state: 'frozen', ySplit: sHdr }];
+      autoFit(wsSales);
+      applyZebra(wsSales, sHdr + 1);
+
+      // CategoryPerformance
+      const wsCat = workbook.addWorksheet('CategoryPerformance');
+      styleBigHeader(wsCat, 'Category Performance');
+      const cHdr = addTable(wsCat, ['Category','Sales','Share%'], (categoryData||[]).map(c=>[c.name, Number(c.value||0), Number(c.percentage||0)]));
+      applyCurrency(wsCat, cHdr);
+      wsCat.views = [{ state: 'frozen', ySplit: cHdr }];
+      autoFit(wsCat);
+      applyZebra(wsCat, cHdr + 1);
+
+      // BestSellers
+      const wsBest = workbook.addWorksheet('BestSellers');
+      styleBigHeader(wsBest, 'Best Sellers');
+      const bHdr = addTable(wsBest, ['Product','Quantity','Sales'], (bestSellers||[]).map(p=>[p.name, Number(p.quantity||0), Number(p.sales||0)]));
+      applyCurrency(wsBest, bHdr);
+      wsBest.views = [{ state: 'frozen', ySplit: bHdr }];
+      autoFit(wsBest);
+      applyZebra(wsBest, bHdr + 1);
+
+      // Payments
+      const wsPay = workbook.addWorksheet('Payments');
+      styleBigHeader(wsPay, 'Payment Distribution');
+      const pHdr = addTable(wsPay, ['Method','Transactions','Amount'], (paymentDistribution||[]).map(p=>[p.method, Number(p.count||0), Number(p.amount||0)]));
+      applyCurrency(wsPay, pHdr);
+      wsPay.views = [{ state: 'frozen', ySplit: pHdr }];
+      autoFit(wsPay);
+      applyZebra(wsPay, pHdr + 1);
+
+      // StaffPerformance
+      const wsStaff = workbook.addWorksheet('StaffPerformance');
+      styleBigHeader(wsStaff, 'Staff Performance');
+      const stHdr = addTable(wsStaff, ['Staff','Transactions','Amount'], (staffPerformance||[]).map(s=>[s.staff, Number(s.count||0), Number(s.amount||0)]));
+      applyCurrency(wsStaff, stHdr);
+      wsStaff.views = [{ state: 'frozen', ySplit: stHdr }];
+      autoFit(wsStaff);
+      applyZebra(wsStaff, stHdr + 1);
+
+      // PeakHours
+      const wsHours = workbook.addWorksheet('PeakHours');
+      styleBigHeader(wsHours, 'Peak Hours');
+      const hHdr = addTable(wsHours, ['Hour','Transactions','Amount'], (peakHours||[]).map(h=>[`${String(h.hour).padStart(2,'0')}:00`, Number(h.count||0), Number(h.amount||0)]));
+      applyCurrency(wsHours, hHdr);
+      wsHours.views = [{ state: 'frozen', ySplit: hHdr }];
+      autoFit(wsHours);
+      applyZebra(wsHours, hHdr + 1);
+
+      // Transactions
+      const wsTx = workbook.addWorksheet('Transactions');
+      styleBigHeader(wsTx, 'Transactions');
+      const tHdr = addTable(wsTx, ['Date','Customer','Items','Amount','Payment','Staff','Status'], (transactionsData||[]).map(t=>[t.date, t.customer, Number(t.items||0), Number(t.amount||0), t.paymentMethod, t.staff, t.status]));
+      applyCurrency(wsTx, tHdr);
+      wsTx.views = [{ state: 'frozen', ySplit: tHdr }];
+      autoFit(wsTx);
+      applyZebra(wsTx, tHdr + 1);
+
+      // Charts sheet
+      const wsViz = workbook.addWorksheet('Charts');
+      styleBigHeader(wsViz, 'Charts');
+
+      // Minimal SVG generators with legends
+      const svgBarChart = (pairs, {width=800, height=300, barColor='#2563eb', title=''}) => {
+        const pad = 40; const chartW = width - pad*2; const chartH = height - pad*2;
+        const max = Math.max(1, ...pairs.map(p => p.value));
+        const barW = chartW / pairs.length;
+        const bars = pairs.map((p, i) => {
+          const h = Math.round((p.value / max) * chartH);
+          const x = pad + i * barW + 6;
+          const y = pad + (chartH - h);
+          return `<rect x="${x}" y="${y}" width="${Math.max(4, barW-12)}" height="${h}" fill="${p.color||barColor}" />`;
+        }).join('');
+        const labels = pairs.map((p,i)=>{
+          const x = pad + i * barW + barW/2;
+          return `<text x="${x}" y="${height-pad+14}" text-anchor="middle" font-size="10" fill="#6b7280">${p.label}</text>`;
+        }).join('');
+        const yAxis = `<line x1="${pad-6}" y1="${pad}" x2="${pad-6}" y2="${height-pad}" stroke="#e5e7eb"/>`;
+        const xAxis = `<line x1="${pad-6}" y1="${height-pad}" x2="${width-pad}" y2="${height-pad}" stroke="#e5e7eb"/>`;
+        const ttl = title ? `<text x="${width/2}" y="22" text-anchor="middle" font-size="14" fill="#111827">${title}</text>` : '';
+        // Legend (first up to 8 items)
+        const legendItems = pairs.slice(0, 8).map((p,i)=>{
+          const lx = pad + (i%4)* (chartW/4);
+          const ly = 30 + Math.floor(i/4)*16;
+          return `<rect x="${lx}" y="${ly}" width="10" height="10" fill="${p.color||barColor}"/><text x="${lx+14}" y="${ly+10}" font-size="10" fill="#374151">${p.label}</text>`;
+        }).join('');
+        return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">${ttl}${legendItems}${yAxis}${xAxis}${bars}${labels}</svg>`;
+      };
+
+      const svgPieChart = (pairs, {width=400, height=300, title=''}) => {
+        const cx = width/2, cy = height/2 + 10, r = Math.min(width, height)*0.35;
+        const total = Math.max(1, pairs.reduce((s,p)=>s+p.value,0));
+        let angle = -Math.PI/2; const slices = [];
+        pairs.forEach((p)=>{
+          const slice = (p.value/total) * Math.PI*2;
+          const x1 = cx + r*Math.cos(angle), y1 = cy + r*Math.sin(angle);
+          const x2 = cx + r*Math.cos(angle+slice), y2 = cy + r*Math.sin(angle+slice);
+          const large = slice > Math.PI ? 1 : 0;
+          slices.push(`<path d="M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z" fill="${p.color}"/>`);
+          angle += slice;
+        });
+        const ttl = title ? `<text x="${width/2}" y="20" text-anchor="middle" font-size="14" fill="#111827">${title}</text>` : '';
+        const legend = pairs.slice(0,8).map((p,i)=>{
+          const lx = 10 + (i%2)* (width/2);
+          const ly = 30 + Math.floor(i/2)*16;
+          return `<rect x="${lx}" y="${ly}" width="10" height="10" fill="${p.color}"/><text x="${lx+14}" y="${ly+10}" font-size="10" fill="#374151">${p.label}</text>`;
+        }).join('');
+        return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">${ttl}${slices.join('')}${legend}</svg>`;
+      };
+
+      const svgLineChart = (pairs, {width=800, height=300, lineColor='#2563eb', title=''}) => {
+        const pad = 40; const chartW = width - pad*2; const chartH = height - pad*2;
+        const max = Math.max(1, ...pairs.map(p => p.value));
+        const step = chartW / Math.max(1, pairs.length-1);
+        const points = pairs.map((p,i)=>{
+          const x = pad + i*step;
+          const y = pad + (chartH - Math.round((p.value/max)*chartH));
+          return `${x},${y}`;
+        }).join(' ');
+        const dots = pairs.map((p,i)=>{
+          const x = pad + i*step;
+          const y = pad + (chartH - Math.round((p.value/max)*chartH));
+          return `<circle cx="${x}" cy="${y}" r="3" fill="${p.color||lineColor}"/>`;
+        }).join('');
+        const xAxis = `<line x1="${pad-6}" y1="${height-pad}" x2="${width-pad}" y2="${height-pad}" stroke="#e5e7eb"/>`;
+        const yAxis = `<line x1="${pad-6}" y1="${pad}" x2="${pad-6}" y2="${height-pad}" stroke="#e5e7eb"/>`;
+        const labels = pairs.map((p,i)=>{
+          const x = pad + i*step; return `<text x="${x}" y="${height-pad+14}" text-anchor="middle" font-size="10" fill="#6b7280">${p.label}</text>`;
+        }).join('');
+        const ttl = title ? `<text x="${width/2}" y="22" text-anchor="middle" font-size="14" fill="#111827">${title}</text>` : '';
+        const legend = pairs.slice(0,8).map((p,i)=>{
+          const lx = pad + (i%4)* (chartW/4);
+          const ly = 30 + Math.floor(i/4)*16;
+          return `<rect x="${lx}" y="${ly}" width="10" height="10" fill="${p.color||lineColor}"/><text x="${lx+14}" y="${ly+10}" font-size="10" fill="#374151">${p.label}</text>`;
+        }).join('');
+        return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">${ttl}${legend}<polyline fill="none" stroke="${lineColor}" stroke-width="2" points="${points}"/>${dots}${xAxis}${yAxis}${labels}</svg>`;
+      };
+
+      const svgToPngDataUrl = async (svgString, width=800, height=300) => {
+        return await new Promise((resolve) => {
+          const img = new Image();
+          const svg = new Blob([svgString], {type: 'image/svg+xml'});
+          const url = URL.createObjectURL(svg);
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = width; canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,width,height);
+            ctx.drawImage(img, 0, 0);
+            URL.revokeObjectURL(url);
+            resolve(canvas.toDataURL('image/png'));
+          };
+          img.src = url;
+        });
+      };
+
+      // Build data pairs
+      const salesPairs = (salesChartData||[]).map((d, i) => ({ label: d.name, value: Number(d.sales||0), color: ['#2563eb','#16a34a','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#84cc16'][i%7] }));
+      const payPairs = (paymentDistribution||[]).map((p,i)=>({ label: p.method, value: Number(p.amount||0), color: ['#06b6d4','#84cc16','#f59e0b','#ef4444'][i%4]}));
+      const hourPairs = (peakHours||[]).map((h,i)=>({ label: String(h.hour).padStart(2,'0'), value: Number(h.amount||0), color: ['#8b5cf6','#2563eb','#16a34a','#f59e0b'][i%4]}));
+
+      const salesSvg = svgLineChart(salesPairs, { title: 'Sales Trend (By Day)', width: 800, height: 300 });
+      const paySvg = svgPieChart(payPairs, { title: 'Payment Amounts Share', width: 600, height: 320 });
+      const hourSvg = svgBarChart(hourPairs, { title: 'Peak Hours Amount (Bar)', width: 800, height: 300 });
+
+      const [salesPng, payPng, hourPng] = await Promise.all([
+        svgToPngDataUrl(salesSvg), svgToPngDataUrl(paySvg), svgToPngDataUrl(hourSvg)
+      ]);
+
+      const imgSalesId = workbook.addImage({ base64: salesPng, extension: 'png' });
+      const imgPayId = workbook.addImage({ base64: payPng, extension: 'png' });
+      const imgHourId = workbook.addImage({ base64: hourPng, extension: 'png' });
+
+      wsViz.addRow(['Sales Trend']);
+      wsViz.addImage(imgSalesId, { tl: { col: 0, row: 6 }, ext: { width: 600, height: 260 } });
+      wsViz.addRow([]); wsViz.addRow(['Payment Distribution']);
+      wsViz.addImage(imgPayId,   { tl: { col: 0, row: 22 }, ext: { width: 480, height: 280 } });
+      wsViz.addRow([]); wsViz.addRow(['Peak Hours']);
+      wsViz.addImage(imgHourId,  { tl: { col: 0, row: 38 }, ext: { width: 600, height: 260 } });
+      autoFit(wsViz);
+
+      // Write file
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = fileName;
+      link.click();
+    } catch (e) {
+      console.error('Failed to export Excel:', e);
+      alert('Failed to export Excel. Please ensure export libraries are installed.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleRefresh = () => {
