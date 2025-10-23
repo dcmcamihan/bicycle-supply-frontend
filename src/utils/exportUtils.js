@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
-import ExcelJS from 'exceljs';
+import * as XLSX from 'xlsx';
 
 const formatCurrency = (amount) => {
   return new Intl.NumberFormat('en-PH', {
@@ -182,7 +182,7 @@ export const generateSalesSummaryPDF = (data) => {
   doc.save(fileName);
 };
 
-export const generateSalesExcelReport = async (data) => {
+export const generateSalesExcelReport = (data) => {
   const {
     dateRange,
     kpiData,
@@ -196,7 +196,7 @@ export const generateSalesExcelReport = async (data) => {
   const currentDate = new Date().toISOString().split('T')[0].replace(/-/g, '');
   const fileName = `Reports${currentDate}.xlsx`;
 
-  const workbook = new ExcelJS.Workbook();
+  const workbook = XLSX.utils.book_new();
 
   // KPI Summary Sheet
   const kpiSheet = XLSX.utils.aoa_to_sheet([

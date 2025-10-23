@@ -8,7 +8,6 @@ import ProductSearch from './components/ProductSearch';
 import CategoryFilter from './components/CategoryFilter';
 import ProductGrid from './components/ProductGrid';
 import ShoppingCart from './components/ShoppingCart';
-import CustomerLookup from './components/CustomerLookup';
 import PaymentMethods from './components/PaymentMethods';
 import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
@@ -484,11 +483,6 @@ const PointOfSale = () => {
                 </div>
                 {/* Right Panel - Cart & Checkout (40% width on desktop) */}
                 <div className="xl:col-span-2 space-y-6">
-                  <CustomerLookup
-                    selectedCustomer={selectedCustomer}
-                    onCustomerSelect={handleCustomerSelect}
-                    onCustomerClear={handleCustomerClear}
-                  />
 
                   {/* Customer Name (optional) and Cashier selection */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

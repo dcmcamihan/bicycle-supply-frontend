@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Icon from '../AppIcon';
 import Button from './Button';
 
@@ -7,6 +7,7 @@ const Header = ({ onSidebarToggle, user = null }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
 
   const handleUserMenuToggle = () => {
     setIsUserMenuOpen(!isUserMenuOpen);
@@ -21,7 +22,9 @@ const Header = ({ onSidebarToggle, user = null }) => {
   const handleSearchSubmit = (e) => {
     e?.preventDefault();
     const searchTerm = e?.target?.search?.value;
-    console.log('Search:', searchTerm);
+    if (searchTerm && searchTerm.trim().length > 0) {
+      navigate(`/inventory-management?q=${encodeURIComponent(searchTerm.trim())}`);
+    }
   };
 
   return (

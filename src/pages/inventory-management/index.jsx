@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 
 import Button from '../../components/ui/Button';
 import Header from '../../components/ui/Header';
@@ -60,6 +60,7 @@ const InventoryManagement = () => {
   const [showProductModal, setShowProductModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [isMobile, setIsMobile] = useState(false);
+  const location = useLocation();
 
   // Products state
   const [rawProducts, setRawProducts] = useState([]);
@@ -488,6 +489,15 @@ const InventoryManagement = () => {
     });
   };
 
+  // Apply header search query param to filters
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const q = params.get('q') || '';
+    if (q !== (filters.search || '')) {
+      setFilters(prev => ({ ...prev, search: q }));
+    }
+  }, [location.search]);
+
   // Barcode scan removed
 
   const handleAddProduct = () => {
@@ -539,16 +549,10 @@ const InventoryManagement = () => {
       const payload = {
         product_name: productData.name,
         description: productData.description || null,
-        barcode: productData.barcode || null,
         category_code: productData.category,
         brand_id: productData.brand ? parseInt(productData.brand) : null,
         price: normalizedPrice,
         reorder_level: productData.reorderLevel ? parseInt(productData.reorderLevel) : 3,
-        weight: productData.weight === '' ? null : (productData.weight ?? null),
-        size: productData.size || null,
-        color: productData.color || null,
-        material: productData.material || null,
-        warranty_period: productData.warranty || null,
         image_url: productData.image_url || null
       };
 
@@ -565,6 +569,49 @@ const InventoryManagement = () => {
         const errText = await res.text();
         throw new Error(errText || (isEdit ? 'Failed to update product' : 'Failed to create product'));
       }
+      // Parse created/updated product to get product_id
+      let savedProduct = null;
+      try { savedProduct = await res.json(); } catch {}
+      const newProductId = isEdit ? productId : (savedProduct?.product_id || savedProduct?.id);
+
+      // When creating a new product: if initial stock provided and supplier selected,
+      // create a supply and a supply_detail so QOH and supplier mapping update correctly
+      if (!isEdit && newProductId && (productData.stock ? parseInt(productData.stock) : 0) > 0 && productData.supplier) {
+        try {
+          const supplyPayload = {
+            supplier_id: parseInt(productData.supplier),
+            supply_date: new Date().toISOString(),
+            payment_method_code: 'CASH',
+            sale_attendant: 6,
+            manager: 13,
+          };
+          const supplyRes = await fetch(API_ENDPOINTS.SUPPLIES, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(supplyPayload)
+          });
+          if (supplyRes.ok) {
+            const supply = await supplyRes.json();
+            const supplyId = supply?.supply_id || supply?.id;
+            if (supplyId) {
+              const supplyDetailPayload = {
+                supply_id: supplyId,
+                product_id: newProductId,
+                quantity_supplied: parseInt(productData.stock)
+              };
+              await fetch(API_ENDPOINTS.SUPPLY_DETAILS, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(supplyDetailPayload)
+              });
+            }
+          }
+        } catch (e) {
+          // Non-blocking: failure here means initial stock/supplier won't reflect, but product is created
+          console.error('Failed to create initial supply for new product', e);
+        }
+      }
+
       // Refresh products list
       const response = await fetch(API_ENDPOINTS.PRODUCTS);
       const data = await response.json();
