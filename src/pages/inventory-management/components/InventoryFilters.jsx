@@ -7,7 +7,8 @@ import Select from '../../../components/ui/Select';
 const InventoryFilters = ({ 
   filters, 
   onFilterChange, 
-  onClearFilters
+  onClearFilters,
+  suppliers = []
 }) => {
   const [categoryOptions, setCategoryOptions] = React.useState([
     { value: '', label: 'All Categories' }
@@ -60,6 +61,15 @@ const InventoryFilters = ({
     { value: 'out-of-stock', label: 'Out of Stock' }
   ];
 
+  const supplierOptions = React.useMemo(() => {
+    const base = [{ value: '', label: 'All Suppliers' }];
+    if (!Array.isArray(suppliers) || suppliers.length === 0) return base;
+    return [
+      ...base,
+      ...suppliers.map(s => ({ value: String(s.id), label: s.name }))
+    ];
+  }, [suppliers]);
+
   const priceRangeOptions = [
     { value: '', label: 'All Prices' },
     { value: '0-500', label: 'Under ₱500' },
@@ -104,7 +114,7 @@ const InventoryFilters = ({
         </div>
       </div>
       {/* Filter Controls */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Select
           label="Category"
           options={categoryOptions}
@@ -119,6 +129,14 @@ const InventoryFilters = ({
           value={filters?.brand || ''}
           onChange={(value) => handleFilterChange('brand', value)}
           placeholder="Select brand"
+        />
+
+        <Select
+          label="Supplier"
+          options={supplierOptions}
+          value={filters?.supplier || ''}
+          onChange={(value) => handleFilterChange('supplier', value)}
+          placeholder="Select supplier"
         />
 
         <Select
@@ -153,6 +171,8 @@ const InventoryFilters = ({
                 displayValue = categoryOptions?.find(opt => opt?.value === value)?.label || value;
               } else if (key === 'brand') {
                 displayValue = brandOptions?.find(opt => opt?.value === value)?.label || value;
+              } else if (key === 'supplier') {
+                displayValue = supplierOptions?.find(opt => opt?.value === value)?.label || value;
               } else if (key === 'stockStatus') {
                 displayValue = stockStatusOptions?.find(opt => opt?.value === value)?.label || value;
               } else if (key === 'priceRange') {

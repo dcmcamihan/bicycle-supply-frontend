@@ -36,9 +36,19 @@ export const API_ENDPOINTS = {
   CATEGORIES: `${API_BASE_URL}/categories`, // GET all, POST new
   CATEGORY: (categoryCode) => `${API_BASE_URL}/categories/${categoryCode}`,
 
+  // Contact Types
+  CONTACT_TYPES: `${API_BASE_URL}/contact-types`,
+  CONTACT_TYPE: (code) => `${API_BASE_URL}/contact-types/${code}`,
+
   // Suppliers
   SUPPLIERS: `${API_BASE_URL}/suppliers`, // GET all, POST new
   SUPPLIER: (id) => `${API_BASE_URL}/suppliers/${id}`,
+
+  // Supplier Contacts
+  SUPPLIER_CONTACTS: `${API_BASE_URL}/supplier-contacts`, // GET all, POST new
+
+  // Supplier Addresses
+  SUPPLIER_ADDRESSES: `${API_BASE_URL}/supplier-addresses`, // GET all, POST new
 
   // Supplies
   SUPPLIES: `${API_BASE_URL}/supplies`, // GET all, POST new

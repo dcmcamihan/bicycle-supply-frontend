@@ -341,24 +341,96 @@ const ProductInfoTabs = ({ product, isEditing, onToggleEdit, onSave, refreshToke
   const [supplierInfo, setSupplierInfo] = React.useState(null);
   const [supplierContacts, setSupplierContacts] = React.useState([]);
   const [poHistory, setPoHistory] = React.useState([]);
+  const [contactTypesMap, setContactTypesMap] = React.useState({});
+
+  // Load contact type descriptions for rendering
+  React.useEffect(() => {
+    const loadContactTypes = async () => {
+      try {
+        const res = await fetch(API_ENDPOINTS.CONTACT_TYPES);
+        if (res.ok) {
+          const data = await res.json();
+          const map = {};
+          for (const ct of data) {
+            map[ct.contact_type_code] = ct.description || ct.contact_type_code;
+          }
+          setContactTypesMap(map);
+        }
+      } catch {}
+    };
+    loadContactTypes();
+  }, []);
 
   React.useEffect(() => {
     const fetchSupplierData = async () => {
-      const supplierId = product?.supplier_id || editedProduct?.supplier_id;
-      if (!supplierId) return;
+      const pid = Number(product?.id || product?.product_id);
+      if (!pid) return;
+      let supplierId = product?.supplier_id || editedProduct?.supplier_id;
+
+      if (!supplierId) {
+        try {
+          const supRes = await fetch(API_ENDPOINTS.SUPPLIES);
+          if (supRes.ok) {
+            const supplies = await supRes.json();
+            const matches = [];
+            for (const sup of supplies) {
+              try {
+                const detRes = await fetch(API_ENDPOINTS.SUPPLY_DETAILS_BY_SUPPLY(sup.supply_id));
+                if (!detRes.ok) continue;
+                const dets = await detRes.json();
+                if (dets?.some(d => Number(d.product_id) === pid)) {
+                  matches.push({ supplier_id: sup.supplier_id, date: new Date(sup.supply_date || 0) });
+                }
+              } catch {}
+            }
+            if (matches.length) {
+              matches.sort((a, b) => b.date - a.date);
+              supplierId = matches[0].supplier_id;
+            }
+          }
+        } catch {}
+      }
+
+      if (!supplierId) {
+        setSupplierInfo(null);
+        setSupplierContacts([]);
+        return;
+      }
+
       try {
         const sres = await fetch(API_ENDPOINTS.SUPPLIER(supplierId));
+        let sdata = null;
         if (sres.ok) {
-          const sdata = await sres.json();
-          setSupplierInfo(sdata);
+          sdata = await sres.json();
         }
-      } catch {}
-      // Contacts (if API exists)
+
+        // Address list -> filter by supplier_id and compose single-line
+        let addressText = '';
+        try {
+          const aRes = await fetch(API_ENDPOINTS.SUPPLIER_ADDRESSES);
+          if (aRes.ok) {
+            const arr = await aRes.json();
+            const addr = arr?.find(a => Number(a.supplier_id) === Number(supplierId));
+            if (addr) {
+              addressText = [addr.street, addr.barangay, addr.city, addr.province, addr.zip_code, addr.country]
+                .filter(Boolean)
+                .join(', ');
+            }
+          }
+        } catch {}
+
+        setSupplierInfo(sdata ? { ...sdata, supplier_address: addressText } : { supplier_id: supplierId, supplier_address: addressText });
+      } catch {
+        setSupplierInfo(null);
+      }
+
+      // Contacts list -> filter by supplier_id
       try {
-        const cres = await fetch(`${API_ENDPOINTS.SUPPLIER(supplierId)}/contacts`);
+        const cres = await fetch(API_ENDPOINTS.SUPPLIER_CONTACTS);
         if (cres.ok) {
           const cdata = await cres.json();
-          setSupplierContacts(Array.isArray(cdata) ? cdata : []);
+          const filtered = (Array.isArray(cdata) ? cdata : []).filter(c => Number(c.supplier_id) === Number(supplierId));
+          setSupplierContacts(filtered);
         } else {
           setSupplierContacts([]);
         }
@@ -367,7 +439,7 @@ const ProductInfoTabs = ({ product, isEditing, onToggleEdit, onSave, refreshToke
       }
     };
     fetchSupplierData();
-  }, [product?.supplier_id, editedProduct?.supplier_id]);
+  }, [product?.id, product?.product_id]);
 
   // Build purchase order history from supplies + supply_details
   React.useEffect(() => {
@@ -447,9 +519,9 @@ const ProductInfoTabs = ({ product, isEditing, onToggleEdit, onSave, refreshToke
               <div key={idx} className="flex items-center justify-between py-2 border-b border-border last:border-b-0">
                 <div className="min-w-0">
                   <span className="text-sm font-body text-foreground">{c.contact_value || c.value}</span>
-                  <span className="text-xs text-muted-foreground ml-2">{c.contact_type || c.type}</span>
+                  <span className="text-xs text-muted-foreground ml-2">{contactTypesMap[c.contact_type_code] || c.contact_type_code || c.type}</span>
                 </div>
-                {c.is_primary ? (
+                {(c.is_primary === 'Y' || c.is_primary === true) ? (
                   <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">Primary</span>
                 ) : null}
               </div>

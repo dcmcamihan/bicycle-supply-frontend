@@ -53,6 +53,7 @@ const InventoryManagement = () => {
     category: '',
     brand: '',
     stockStatus: '',
+    supplier: '',
     priceRange: ''
   });
   const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
@@ -139,6 +140,7 @@ const InventoryManagement = () => {
 
   // Suppliers state
   const [mockSuppliers, setMockSuppliers] = useState([]);
+  const [productSupplierMap, setProductSupplierMap] = useState(new Map()); // product_id -> latest supplier_id
 
   // Fetch suppliers from API
   useEffect(() => {
@@ -148,16 +150,51 @@ const InventoryManagement = () => {
         const data = await response.json();
         // Map API data to expected structure
         const mapped = data.map(item => ({
-          id: item.supplier_id,
-          name: item.supplier_name
-        }));
-        setMockSuppliers(mapped);
-      } catch (error) {
-        console.error('Failed to fetch suppliers:', error);
+        id: item.supplier_id,
+        name: item.supplier_name
+      }));
+      setMockSuppliers(mapped);
+    } catch (error) {
+      console.error('Failed to fetch suppliers:', error);
+    }
+  };
+  fetchSuppliers();
+  }, []);
+
+  // Build latest supplier per product using supplies + supply_details
+  useEffect(() => {
+    const buildProductSupplierMap = async () => {
+      try {
+        const map = new Map();
+        const supRes = await fetch(API_ENDPOINTS.SUPPLIES);
+        if (!supRes.ok) { setProductSupplierMap(map); return; }
+        const supplies = await supRes.json();
+        for (const sup of supplies) {
+          const supplyId = sup?.supply_id;
+          const supplierId = sup?.supplier_id;
+          const date = new Date(sup?.supply_date || 0).getTime();
+          try {
+            const detRes = await fetch(API_ENDPOINTS.SUPPLY_DETAILS_BY_SUPPLY(supplyId));
+            if (!detRes.ok) continue;
+            const dets = await detRes.json();
+            for (const d of dets) {
+              const pid = Number(d?.product_id);
+              if (!pid) continue;
+              const prev = map.get(pid);
+              if (!prev || date > prev.date) {
+                map.set(pid, { supplier_id: Number(supplierId), date });
+              }
+            }
+          } catch {}
+        }
+        setProductSupplierMap(map);
+      } catch {
+        setProductSupplierMap(new Map());
       }
     };
-    fetchSuppliers();
+    buildProductSupplierMap();
   }, []);
+
   // Recent movements (real data)
   const [recentMovements, setRecentMovements] = useState([]);
 
@@ -307,7 +344,7 @@ const InventoryManagement = () => {
   // Filter and sort products
   const filteredAndSortedProducts = useMemo(() => {
     // If all filters are empty, return all products
-    const noFilters = !filters?.search && !filters?.category && !filters?.brand && !filters?.stockStatus && !filters?.priceRange;
+    const noFilters = !filters?.search && !filters?.category && !filters?.brand && !filters?.stockStatus && !filters?.priceRange && !filters?.supplier;
     let filtered = mockProducts;
     if (!noFilters) {
       filtered = mockProducts?.filter(product => {
@@ -331,6 +368,14 @@ const InventoryManagement = () => {
         // Brand filter
         if (filters?.brand && String(product?.brand_id) !== String(filters?.brand)) {
           return false;
+        }
+
+        // Supplier filter (use latest supplier for product from map)
+        if (filters?.supplier) {
+          const entry = productSupplierMap.get(Number(product?.id));
+          if (!entry || String(entry.supplier_id) !== String(filters?.supplier)) {
+            return false;
+          }
         }
 
         // Stock status filter
@@ -438,6 +483,7 @@ const InventoryManagement = () => {
       category: '',
       brand: '',
       stockStatus: '',
+      supplier: '',
       priceRange: ''
     });
   };
@@ -609,6 +655,7 @@ const InventoryManagement = () => {
                   filters={filters}
                   onFilterChange={handleFilterChange}
                   onClearFilters={handleClearFilters}
+                  suppliers={mockSuppliers}
                 />
 
                 {/* Bulk Actions */}
