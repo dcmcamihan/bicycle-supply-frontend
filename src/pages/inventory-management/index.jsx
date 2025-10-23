@@ -113,18 +113,17 @@ const InventoryManagement = () => {
             brand: brandName,
             price: parseFloat(item.price),
             // Add default values for missing fields
-            sku: '',
-            description: '',
-            cost: 0,
+            sku: String(item.product_id),
+            description: item.description || '',
             stock: quantityOnHand,
             reorderLevel: item.reorder_level,
-            barcode: '',
-            weight: 0,
+            barcode: item.barcode || '',
+            weight: item.weight ? Number(item.weight) : 0,
             dimensions: '',
-            color: '',
-            size: '',
-            material: '',
-            warranty: '',
+            color: item.color || '',
+            size: item.size || '',
+            material: item.material || '',
+            warranty: item.warranty_period || '',
             image: '',
             image_url: item.image_url || '',
             lastUpdated: '',
@@ -159,44 +158,140 @@ const InventoryManagement = () => {
     };
     fetchSuppliers();
   }, []);
+  // Recent movements (real data)
+  const [recentMovements, setRecentMovements] = useState([]);
 
-  const mockRecentMovements = [
-    {
-      id: 1,
-      productName: "Trek Domane SL 7",
-      type: "sale",
-      quantity: -1,
-      timestamp: "2025-01-23T09:15:00Z"
-    },
-    {
-      id: 2,
-      productName: "Specialized Rockhopper Elite",
-      type: "restock",
-      quantity: 5,
-      timestamp: "2025-01-23T08:30:00Z"
-    },
-    {
-      id: 3,
-      productName: "Giant Escape 3",
-      type: "sale",
-      quantity: -2,
-      timestamp: "2025-01-22T16:45:00Z"
-    },
-    {
-      id: 4,
-      productName: "Bike Helmet - Premium",
-      type: "adjustment",
-      quantity: -1,
-      timestamp: "2025-01-22T14:20:00Z"
-    },
-    {
-      id: 5,
-      productName: "Scott E-Aspect 930",
-      type: "return",
-      quantity: 1,
-      timestamp: "2025-01-22T11:10:00Z"
-    }
-  ];
+  // Load recent movements from sales/supplies/stockouts
+  useEffect(() => {
+    const loadMovements = async () => {
+      try {
+        // Build product name map from current products
+        const productNameMap = new Map();
+        mockProducts.forEach(p => productNameMap.set(Number(p.id), p.name));
+
+        const movements = [];
+
+        // Sales -> negative movements per sale detail
+        try {
+          const salesRes = await fetch(API_ENDPOINTS.SALES);
+          if (salesRes.ok) {
+            const sales = await salesRes.json();
+            for (const sale of sales) {
+              const saleId = sale?.sale_id || sale?.id;
+              const saleDate = sale?.sale_date || sale?.date || sale?.created_at;
+              if (!saleId || !saleDate) continue;
+              try {
+                const detailsRes = await fetch(API_ENDPOINTS.SALE_DETAILS(saleId));
+                if (detailsRes.ok) {
+                  const details = await detailsRes.json();
+                  for (const d of details) {
+                    const pid = Number(d?.product_id);
+                    const qty = Number(d?.quantity_sold ?? d?.quantity ?? 0);
+                    if (!pid || !qty) continue;
+                    movements.push({
+                      id: `sale-${saleId}-${pid}`,
+                      productId: pid,
+                      productName: productNameMap.get(pid) || `#${pid}`,
+                      type: 'sale',
+                      quantity: -Math.abs(qty),
+                      timestamp: saleDate
+                    });
+                  }
+                }
+              } catch {}
+            }
+          }
+        } catch {}
+
+        // Supplies -> positive movements per supply detail
+        try {
+          const supRes = await fetch(API_ENDPOINTS.SUPPLIES);
+          if (supRes.ok) {
+            const supplies = await supRes.json();
+            for (const sup of supplies) {
+              const supplyId = sup?.supply_id || sup?.id;
+              const supplyDate = sup?.supply_date || sup?.date || sup?.created_at;
+              if (!supplyId || !supplyDate) continue;
+              try {
+                const detRes = await fetch(API_ENDPOINTS.SUPPLY_DETAILS_BY_SUPPLY(supplyId));
+                if (detRes.ok) {
+                  const sdetails = await detRes.json();
+                  for (const sd of sdetails) {
+                    const pid = Number(sd?.product_id);
+                    const qty = Number(sd?.quantity_supplied ?? sd?.quantity ?? 0);
+                    if (!pid || !qty) continue;
+                    movements.push({
+                      id: `supply-${supplyId}-${pid}`,
+                      productId: pid,
+                      productName: productNameMap.get(pid) || `#${pid}`,
+                      type: 'restock',
+                      quantity: Math.abs(qty),
+                      timestamp: supplyDate
+                    });
+                  }
+                }
+              } catch {}
+            }
+          }
+        } catch {}
+
+        // Stockouts (adjustments) -> negative movements
+        try {
+          const soRes = await fetch(API_ENDPOINTS.STOCKOUTS);
+          if (soRes.ok) {
+            const stockouts = await soRes.json();
+            for (const so of stockouts) {
+              const stockoutId = so?.stockout_id || so?.id;
+              const date = so?.stockout_date || so?.date || so?.created_at;
+              const pid = Number(so?.product_id);
+              const qtyRemoved = Number(so?.quantity_removed ?? 0);
+              if (pid && qtyRemoved) {
+                movements.push({
+                  id: `stockout-${stockoutId}-${pid}`,
+                  productId: pid,
+                  productName: productNameMap.get(pid) || `#${pid}`,
+                  type: 'adjustment',
+                  quantity: -Math.abs(qtyRemoved),
+                  timestamp: date
+                });
+                continue;
+              }
+              // If product/qty not on stockout, try details
+              try {
+                if (API_ENDPOINTS.STOCKOUT_DETAILS_BY_STOCKOUT) {
+                  const sodRes = await fetch(API_ENDPOINTS.STOCKOUT_DETAILS_BY_STOCKOUT(stockoutId));
+                  if (sodRes.ok) {
+                    const sods = await sodRes.json();
+                    for (const sd of sods) {
+                      const pid2 = Number(sd?.product_id);
+                      const qty2 = Number(sd?.quantity_removed ?? sd?.quantity ?? 0);
+                      if (!pid2 || !qty2) continue;
+                      movements.push({
+                        id: `stockout-${stockoutId}-${pid2}`,
+                        productId: pid2,
+                        productName: productNameMap.get(pid2) || `#${pid2}`,
+                        type: 'adjustment',
+                        quantity: -Math.abs(qty2),
+                        timestamp: date
+                      });
+                    }
+                  }
+                }
+              } catch {}
+            }
+          }
+        } catch {}
+
+        // Sort DESC by timestamp and take latest 15
+        movements.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        setRecentMovements(movements.slice(0, 15));
+      } catch (e) {
+        setRecentMovements([]);
+      }
+    };
+    // Trigger when products mapped to have names
+    if (mockProducts.length > 0) loadMovements();
+  }, [mockProducts]);
 
   // Check for mobile viewport
   useEffect(() => {
@@ -371,17 +466,68 @@ const InventoryManagement = () => {
     setShowProductModal(true);
   };
 
-  const handleDeleteProduct = (product) => {
-    if (window.confirm(`Are you sure you want to delete "${product?.name}"?`)) {
-      console.log('Deleting product:', product?.id);
-      // In a real app, this would make an API call
+  const handleDeleteProduct = async (product) => {
+    const confirmed = window.confirm(`Are you sure you want to delete "${product?.name}"?`);
+    if (!confirmed) return;
+    try {
+      const res = await fetch(API_ENDPOINTS.PRODUCT(product.id), { method: 'DELETE' });
+      if (!res.ok && res.status !== 204) {
+        const errText = await res.text();
+        throw new Error(errText || 'Failed to delete product');
+      }
+      // Refresh list
+      const response = await fetch(API_ENDPOINTS.PRODUCTS);
+      const data = await response.json();
+      setRawProducts(data);
+    } catch (error) {
+      console.error('Failed to delete product:', error);
+      alert('Failed to delete product');
     }
   };
 
-  const handleSaveProduct = async (productData) => {
-    console.log('Saving product:', productData);
-    // In a real app, this would make an API call
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+  const handleSaveProduct = async (productData, productId = null) => {
+    try {
+      // Ensure price is two decimals to match DECIMAL(10,2)
+      const normalizedPrice = productData.price != null ? Number(parseFloat(productData.price).toFixed(2)) : null;
+
+      const payload = {
+        product_name: productData.name,
+        description: productData.description || null,
+        barcode: productData.barcode || null,
+        category_code: productData.category,
+        brand_id: productData.brand ? parseInt(productData.brand) : null,
+        price: normalizedPrice,
+        reorder_level: productData.reorderLevel ? parseInt(productData.reorderLevel) : 3,
+        weight: productData.weight === '' ? null : (productData.weight ?? null),
+        size: productData.size || null,
+        color: productData.color || null,
+        material: productData.material || null,
+        warranty_period: productData.warranty || null,
+        image_url: productData.image_url || null
+      };
+
+      const isEdit = Boolean(productId);
+      const url = isEdit ? API_ENDPOINTS.PRODUCT(productId) : API_ENDPOINTS.PRODUCTS;
+      const method = isEdit ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(errText || (isEdit ? 'Failed to update product' : 'Failed to create product'));
+      }
+      // Refresh products list
+      const response = await fetch(API_ENDPOINTS.PRODUCTS);
+      const data = await response.json();
+      setRawProducts(data);
+    } catch (error) {
+      console.error('Failed to save product:', error);
+      alert('Failed to save product');
+      throw error;
+    }
   };
 
   const handleBulkEdit = () => {
@@ -443,16 +589,6 @@ const InventoryManagement = () => {
                   </p>
                 </div>
                 <div className="flex items-center space-x-3">
-                  <Link to="/product-details">
-                    <Button
-                      variant="outline"
-                      iconName="Eye"
-                      iconPosition="left"
-                      iconSize={18}
-                    >
-                      View Details
-                    </Button>
-                  </Link>
                   <Button
                     onClick={handleAddProduct}
                     iconName="Plus"
@@ -485,6 +621,8 @@ const InventoryManagement = () => {
                   onBulkCategoryUpdate={handleBulkCategoryUpdate}
                   onClearSelection={() => setSelectedItems([])}
                 />
+
+              
 
                 {/* Products Table/Cards */}
                 {isMobile ? (
@@ -531,7 +669,7 @@ const InventoryManagement = () => {
                 <InventorySidebar
                   summaryData={summaryData}
                   lowStockItems={lowStockItems}
-                  recentMovements={mockRecentMovements}
+                  recentMovements={recentMovements}
                   onReorderClick={handleReorderClick}
                   onViewMovements={handleViewMovements}
                 />
@@ -545,8 +683,10 @@ const InventoryManagement = () => {
         isOpen={showProductModal}
         onClose={() => setShowProductModal(false)}
         product={editingProduct}
-        onSave={handleSaveProduct}
+        onSave={(data) => handleSaveProduct(data, editingProduct?.id)}
         suppliers={mockSuppliers}
+        categories={categories}
+        brands={brands}
       />
     </div>
   );

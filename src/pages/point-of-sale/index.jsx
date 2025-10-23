@@ -12,6 +12,8 @@ import CustomerLookup from './components/CustomerLookup';
 import PaymentMethods from './components/PaymentMethods';
 import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
+import Input from '../../components/ui/Input';
+import Select from '../../components/ui/Select';
 
 const PointOfSale = () => {
   // Payment methods from API
@@ -30,11 +32,29 @@ const PointOfSale = () => {
     };
     fetchPaymentMethods();
   }, []);
+
+  // Fetch employees for cashier dropdown
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      try {
+        const res = await fetch(API_ENDPOINTS.EMPLOYEES);
+        if (!res.ok) throw new Error('Failed to fetch employees');
+        const data = await res.json();
+        setEmployees(data);
+      } catch (err) {
+        setEmployees([]);
+      }
+    };
+    fetchEmployees();
+  }, []);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
   const [cartItems, setCartItems] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [customerName, setCustomerName] = useState('');
+  const [employees, setEmployees] = useState([]);
+  const [cashierId, setCashierId] = useState('');
   const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
   const [lastTransaction, setLastTransaction] = useState(null);
 
@@ -192,12 +212,40 @@ const PointOfSale = () => {
 
   const handlePaymentComplete = (paymentData) => {
     (async () => {
+      // Validate cashier selection
+      if (!cashierId) {
+        alert('Please select a cashier before completing payment.');
+        return;
+      }
+
+      // Resolve customer_id
+      let customerIdToUse = selectedCustomer?.id || null;
+      if (!customerIdToUse && customerName && customerName.trim().length > 0) {
+        // Create a basic customer record
+        const parts = customerName.trim().split(/\s+/);
+        const first_name = parts[0] || 'Customer';
+        const last_name = parts.slice(1).join(' ') || 'Walk-in';
+        try {
+          const custRes = await fetch(API_ENDPOINTS.CUSTOMERS, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ first_name, last_name })
+          });
+          if (!custRes.ok) throw new Error(await custRes.text());
+          const cust = await custRes.json();
+          customerIdToUse = cust.customer_id || cust.id;
+        } catch (err) {
+          alert('Failed to create customer: ' + err.message);
+          return;
+        }
+      }
+
       // 1. POST Sale
       const salePayload = {
-        customer_id: selectedCustomer?.id || 1,
+        customer_id: customerIdToUse || null,
         sale_date: new Date().toISOString(),
-        cashier: 1, // Replace with actual cashier ID if available
-        manager: 13 // Replace with actual manager ID if available
+        cashier: parseInt(cashierId),
+        manager: 13 // Keep static manager for now
       };
       let saleId;
       // Generate transaction ID now so it can be used as reference_number
@@ -278,12 +326,13 @@ const PointOfSale = () => {
       setLastTransaction({
         ...paymentData,
         items: [...cartItems],
-        customer: selectedCustomer,
+        customer: selectedCustomer || (customerName ? { name: customerName } : null),
         transactionId
       });
       setShowPaymentSuccess(true);
       setCartItems([]);
       setSelectedCustomer(null);
+      setCustomerName('');
     })();
   };
 
@@ -440,6 +489,25 @@ const PointOfSale = () => {
                     onCustomerSelect={handleCustomerSelect}
                     onCustomerClear={handleCustomerClear}
                   />
+
+                  {/* Customer Name (optional) and Cashier selection */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Input
+                      label="Customer Name (optional)"
+                      type="text"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e?.target?.value)}
+                      placeholder="Enter customer full name"
+                    />
+                    <Select
+                      label="Cashier"
+                      options={(employees || []).map(e => ({ value: String(e.employee_id), label: `${e.first_name} ${e.last_name}` }))}
+                      value={cashierId}
+                      onChange={(val) => setCashierId(val)}
+                      placeholder="Select cashier"
+                      required
+                    />
+                  </div>
 
                   <div className="h-[32rem]">
                     <ShoppingCart

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 
-const ProductActions = ({ product, onEdit, onDuplicate, onDelete, onAddToCart }) => {
+const ProductActions = ({ product, onEdit, onDuplicate, onDelete, onAddToCart, onAdjustStock }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -95,6 +95,7 @@ const ProductActions = ({ product, onEdit, onDuplicate, onDelete, onAddToCart })
             iconPosition="left"
             iconSize={16}
             fullWidth
+            onClick={onAdjustStock}
           >
             Adjust Stock
           </Button>

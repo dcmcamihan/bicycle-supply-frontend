@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LabelList } from 'recharts';
 
 import Button from '../../../components/ui/Button';
 
@@ -12,6 +12,12 @@ const CATEGORY_COLORS = {
   'ACCESSORY': '#27AE60',
   // Add more mappings as needed
 };
+
+const EXTENDED_COLORS = [
+  '#2563eb', '#16a34a', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16', '#f97316',
+  '#dc2626', '#0ea5e9', '#22c55e', '#a855f7', '#14b8a6', '#eab308', '#fb7185', '#10b981',
+  '#f43f5e', '#3b82f6', '#fbbf24', '#34d399', '#7c3aed', '#38bdf8', '#d946ef', '#f87171'
+];
 
 const CategoryChart = ({ data, title = "Category Performance", dateRange }) => {
   const [viewType, setViewType] = useState('pie');
@@ -92,16 +98,34 @@ const CategoryChart = ({ data, title = "Category Performance", dateRange }) => {
           allSaleDetails = allSaleDetails.concat(details);
         }
 
-        // 4. Aggregate sales by category
+        // 4. Aggregate sales by category (use detail.unit_price if present; fallback to product.price)
         const categoryTotals = {};
+        const productCache = new Map();
         for (const detail of allSaleDetails) {
-          // Fetch product info for each sale detail
-          const productRes = await fetch(API_ENDPOINTS.PRODUCT(detail.product_id));
-          const product = await productRes.json();
-          const categoryCode = product.category_code;
+          const productId = detail.product_id;
+          // Determine quantity from possible field names
+          const qty = Number(detail.quantity_sold ?? detail.quantity ?? detail.qty ?? 0);
+          if (!productId || !qty) continue;
+
+          let product = productCache.get(productId);
+          if (!product) {
+            try {
+              const productRes = await fetch(API_ENDPOINTS.PRODUCT(productId));
+              if (productRes.ok) {
+                product = await productRes.json();
+                productCache.set(productId, product);
+              } else {
+                product = {};
+              }
+            } catch {
+              product = {};
+            }
+          }
+
+          const categoryCode = product.category_code || product.category || 'UNKNOWN';
           const categoryName = categoryMap[categoryCode] || categoryCode;
-          const price = parseFloat(product.price);
-          const saleValue = price * detail.quantity_sold;
+          const unitPrice = Number(detail.unit_price ?? product.price ?? 0) || 0;
+          const saleValue = unitPrice * qty;
           if (!categoryTotals[categoryName]) {
             categoryTotals[categoryName] = { name: categoryName, value: 0, code: categoryCode };
           }
@@ -110,12 +134,14 @@ const CategoryChart = ({ data, title = "Category Performance", dateRange }) => {
 
         // 5. Map category names/colors and calculate percentages
         const totalSales = Object.values(categoryTotals).reduce((sum, cat) => sum + cat.value, 0);
-        const categories = Object.entries(categoryTotals).map(([name, cat]) => ({
+        let categories = Object.entries(categoryTotals).map(([name, cat], index) => ({
           name,
-          value: cat.value,
+          value: Number(cat.value) || 0,
           percentage: totalSales ? Number(((cat.value / totalSales) * 100).toFixed(2)) : 0,
-          color: CATEGORY_COLORS[cat.code] || '#8884d8',
+          color: CATEGORY_COLORS[cat.code] || EXTENDED_COLORS[index % EXTENDED_COLORS.length],
         }));
+        // Sort by value desc for a clearer bar chart
+        categories = categories.sort((a, b) => b.value - a.value);
         setCategoryData(categories);
       } catch (err) {
         // fallback to empty or mock data
@@ -210,7 +236,15 @@ const CategoryChart = ({ data, title = "Category Performance", dateRange }) => {
       </div>
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Chart */}
-        <div className="flex-1 h-80" aria-label="Category Performance Chart">
+        <div
+          className="flex-1 overflow-auto"
+          aria-label="Category Performance Chart"
+          style={{
+            height: viewType === 'bar'
+              ? Math.max(320, (categoryData?.length || 0) * 36)
+              : 320
+          }}
+        >
           <ResponsiveContainer width="100%" height="100%">
             {viewType === 'pie' ? (
               <PieChart>
@@ -231,10 +265,12 @@ const CategoryChart = ({ data, title = "Category Performance", dateRange }) => {
                 <Tooltip content={<CustomTooltip />} />
               </PieChart>
             ) : (
-              <BarChart data={categoryData} layout="horizontal">
+              <BarChart data={categoryData} layout="vertical" margin={{ top: 8, right: 24, bottom: 8, left: 16 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                 <XAxis 
                   type="number" 
+                  domain={[0, (Math.max(0, ...categoryData.map(c => c.value)) || 1) * 1.1]}
+                  allowDecimals={false}
                   stroke="var(--color-muted-foreground)"
                   fontSize={12}
                   fontFamily="Source Sans Pro"
@@ -243,19 +279,23 @@ const CategoryChart = ({ data, title = "Category Performance", dateRange }) => {
                 <YAxis 
                   type="category" 
                   dataKey="name" 
+                  interval={0}
+                  width={140}
                   stroke="var(--color-muted-foreground)"
                   fontSize={12}
                   fontFamily="Source Sans Pro"
-                  width={100}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Bar 
                   dataKey="value" 
                   radius={[0, 4, 4, 0]}
+                  barSize={categoryData.length > 12 ? 16 : 22}
+                  barCategoryGap={categoryData.length > 12 ? '8%' : '12%'}
                 >
                   {categoryData?.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry?.color} />
                   ))}
+                  <LabelList dataKey="value" position="right" formatter={(v) => formatCurrency(v)} fill="var(--color-foreground)" fontSize={11} />
                 </Bar>
               </BarChart>
             )}

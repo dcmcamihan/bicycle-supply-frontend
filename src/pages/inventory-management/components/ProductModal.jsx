@@ -5,57 +5,50 @@ import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
 import { Checkbox } from '../../../components/ui/Checkbox';
+import API_ENDPOINTS from '../../../config/api';
+import AdjustStockModal from './AdjustStockModal';
 
 const ProductModal = ({ 
   isOpen, 
   onClose, 
   product = null, 
   onSave,
-  suppliers = [] 
+  suppliers = [],
+  categories = [],
+  brands = []
 }) => {
   const [formData, setFormData] = useState({
     name: '',
-    sku: '',
     category: '',
     brand: '',
     description: '',
     price: '',
-    cost: '',
     stock: '',
     reorderLevel: '',
     supplier: '',
     barcode: '',
     weight: '',
-    dimensions: '',
     color: '',
     size: '',
     material: '',
     warranty: '',
-    image: '',
+    image_url: '',
     isActive: true,
     trackInventory: true
   });
 
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const [currentQoh, setCurrentQoh] = useState(0);
+  const [showAdjust, setShowAdjust] = useState(false);
 
-  const categoryOptions = [
-    { value: 'mountain', label: 'Mountain Bikes' },
-    { value: 'road', label: 'Road Bikes' },
-    { value: 'hybrid', label: 'Hybrid Bikes' },
-    { value: 'electric', label: 'Electric Bikes' },
-    { value: 'accessories', label: 'Accessories' },
-    { value: 'parts', label: 'Parts & Components' }
-  ];
+  const categoryOptions = Array.isArray(categories) && categories.length > 0
+    ? categories.map(c => ({ value: c.category_code, label: c.category_name }))
+    : [];
 
-  const brandOptions = [
-    { value: 'trek', label: 'Trek' },
-    { value: 'specialized', label: 'Specialized' },
-    { value: 'giant', label: 'Giant' },
-    { value: 'cannondale', label: 'Cannondale' },
-    { value: 'scott', label: 'Scott' },
-    { value: 'bianchi', label: 'Bianchi' }
-  ];
+  const brandOptions = Array.isArray(brands) && brands.length > 0
+    ? brands.map(b => ({ value: String(b.brand_id), label: b.brand_name }))
+    : [];
 
   const supplierOptions = suppliers?.map(supplier => ({
     value: supplier?.id,
@@ -66,23 +59,20 @@ const ProductModal = ({
     if (product) {
       setFormData({
         name: product?.name || '',
-        sku: product?.sku || '',
-        category: product?.category || '',
-        brand: product?.brand || '',
+        category: product?.category_code || product?.category || '',
+        brand: product?.brand_id ? String(product?.brand_id) : (product?.brand || ''),
         description: product?.description || '',
         price: product?.price?.toString() || '',
-        cost: product?.cost?.toString() || '',
         stock: product?.stock?.toString() || '',
         reorderLevel: product?.reorderLevel?.toString() || '',
         supplier: product?.supplierId || '',
         barcode: product?.barcode || '',
         weight: product?.weight?.toString() || '',
-        dimensions: product?.dimensions || '',
         color: product?.color || '',
         size: product?.size || '',
         material: product?.material || '',
         warranty: product?.warranty || '',
-        image: product?.image || '',
+        image_url: product?.image_url || product?.image || '',
         isActive: product?.isActive !== false,
         trackInventory: product?.trackInventory !== false
       });
@@ -90,29 +80,42 @@ const ProductModal = ({
       // Reset form for new product
       setFormData({
         name: '',
-        sku: '',
         category: '',
         brand: '',
         description: '',
         price: '',
-        cost: '',
         stock: '',
         reorderLevel: '',
         supplier: '',
         barcode: '',
         weight: '',
-        dimensions: '',
         color: '',
         size: '',
         material: '',
         warranty: '',
-        image: '',
+        image_url: '',
         isActive: true,
         trackInventory: true
       });
     }
     setErrors({});
   }, [product, isOpen]);
+
+  // Fetch live quantity on hand for read-only display
+  useEffect(() => {
+    const fetchQoh = async () => {
+      try {
+        const pid = product?.id || product?.product_id;
+        if (!pid) return;
+        const res = await fetch(`${API_ENDPOINTS.PRODUCT(pid)}/quantity-on-hand`);
+        if (res.ok) {
+          const qoh = await res.json();
+          setCurrentQoh(Number(qoh) || 0);
+        }
+      } catch {}
+    };
+    if (isOpen) fetchQoh();
+  }, [isOpen, product?.id, product?.product_id]);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -125,14 +128,11 @@ const ProductModal = ({
     const newErrors = {};
 
     if (!formData?.name?.trim()) newErrors.name = 'Product name is required';
-    if (!formData?.sku?.trim()) newErrors.sku = 'SKU is required';
     if (!formData?.category) newErrors.category = 'Category is required';
-    if (!formData?.price || parseFloat(formData?.price) <= 0) {
+    if (!formData?.price || isNaN(parseFloat(formData?.price)) || parseFloat(formData?.price) <= 0) {
       newErrors.price = 'Valid price is required';
     }
-    if (formData?.trackInventory && (!formData?.stock || parseInt(formData?.stock) < 0)) {
-      newErrors.stock = 'Valid stock quantity is required';
-    }
+    // Stock is optional on creation; inventory is managed via supplies/sales
 
     setErrors(newErrors);
     return Object.keys(newErrors)?.length === 0;
@@ -148,14 +148,13 @@ const ProductModal = ({
     try {
       const productData = {
         ...formData,
-        price: parseFloat(formData?.price),
-        cost: formData?.cost ? parseFloat(formData?.cost) : 0,
-        stock: formData?.trackInventory ? parseInt(formData?.stock) : 0,
+        price: formData?.price ? parseFloat(formData?.price) : 0,
+        // stock is not persisted directly; managed via movement entries
         reorderLevel: formData?.reorderLevel ? parseInt(formData?.reorderLevel) : 0,
-        weight: formData?.weight ? parseFloat(formData?.weight) : 0
+        weight: formData?.weight ? parseFloat(formData?.weight) : ''
       };
 
-      await onSave(productData);
+      await onSave(productData, product?.id || null);
       onClose();
     } catch (error) {
       console.error('Error saving product:', error);
@@ -164,21 +163,7 @@ const ProductModal = ({
     }
   };
 
-  const handleImageUpload = (e) => {
-    const file = e?.target?.files?.[0];
-    if (file) {
-      // In a real app, you would upload to a server
-      const imageUrl = URL.createObjectURL(file);
-      handleInputChange('image', imageUrl);
-    }
-  };
-
-  const generateSKU = () => {
-    const timestamp = Date.now()?.toString()?.slice(-6);
-    const randomStr = Math.random()?.toString(36)?.substring(2, 5)?.toUpperCase();
-    const sku = `${formData?.category?.toUpperCase()?.slice(0, 3)}${timestamp}${randomStr}`;
-    handleInputChange('sku', sku);
-  };
+  // Image is managed as a URL matching backend's image_url
 
   if (!isOpen) return null;
 
@@ -217,29 +202,7 @@ const ProductModal = ({
                     required
                     placeholder="Enter product name"
                   />
-
-                  <div className="flex space-x-2">
-                    <Input
-                      label="SKU"
-                      type="text"
-                      value={formData?.sku}
-                      onChange={(e) => handleInputChange('sku', e?.target?.value)}
-                      error={errors?.sku}
-                      required
-                      placeholder="Product SKU"
-                      className="flex-1"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={generateSKU}
-                      iconName="RefreshCw"
-                      iconSize={16}
-                      className="mt-6"
-                    >
-                      Generate
-                    </Button>
-                  </div>
+                  <div />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -282,16 +245,7 @@ const ProductModal = ({
                     min="0"
                     step="0.01"
                   />
-
-                  <Input
-                    label="Cost"
-                    type="number"
-                    value={formData?.cost}
-                    onChange={(e) => handleInputChange('cost', e?.target?.value)}
-                    placeholder="0.00"
-                    min="0"
-                    step="0.01"
-                  />
+                  <div />
                 </div>
 
                 {formData?.trackInventory && (
@@ -300,9 +254,8 @@ const ProductModal = ({
                       label="Current Stock"
                       type="number"
                       value={formData?.stock}
-                      onChange={(e) => handleInputChange('stock', e?.target?.value)}
-                      error={errors?.stock}
-                      required
+                      onChange={() => {}}
+                      disabled
                       placeholder="0"
                       min="0"
                     />
@@ -317,6 +270,9 @@ const ProductModal = ({
                     />
                   </div>
                 )}
+                {formData?.trackInventory && (
+                  <p className="text-xs text-muted-foreground">Stock is managed via movements. Use Adjust Stock in Product Details to change quantity on hand.</p>
+                )}
 
                 <Select
                   label="Supplier"
@@ -329,54 +285,38 @@ const ProductModal = ({
 
               {/* Right Column - Additional Details & Image */}
               <div className="space-y-4">
-                {/* Product Image */}
+                {/* Product Image (URL) */}
                 <div>
                   <label className="block font-body font-medium text-sm text-foreground mb-2">
-                    Product Image
+                    Image URL (optional)
                   </label>
-                  <div className="border-2 border-dashed border-border rounded-lg p-4 text-center">
-                    {formData?.image ? (
-                      <div className="relative">
-                        <Image
-                          src={formData?.image}
-                          alt="Product preview"
-                          className="w-full h-32 object-cover rounded-lg mb-2"
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleInputChange('image', '')}
-                          iconName="X"
-                          iconSize={16}
-                        >
-                          Remove
-                        </Button>
-                      </div>
-                    ) : (
-                      <div>
-                        <Icon name="Upload" size={32} className="text-muted-foreground mx-auto mb-2" />
-                        <p className="font-body text-sm text-muted-foreground mb-2">
-                          Upload product image
-                        </p>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleImageUpload}
-                          className="hidden"
-                          id="image-upload"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => document.getElementById('image-upload')?.click()}
-                        >
-                          Choose File
-                        </Button>
-                      </div>
-                    )}
-                  </div>
+                  <Input
+                    label="Image URL"
+                    type="text"
+                    value={formData?.image_url}
+                    onChange={(e) => handleInputChange('image_url', e?.target?.value)}
+                    placeholder="https://..."
+                  />
+                  {formData?.image_url ? (
+                    <div className="mt-2">
+                      <Image
+                        src={formData?.image_url}
+                        alt="Product preview"
+                        className="w-full h-32 object-cover rounded-lg"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleInputChange('image_url', '')}
+                        iconName="X"
+                        iconSize={16}
+                        className="mt-2"
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  ) : null}
                 </div>
 
                 {/* Additional Details */}
@@ -472,6 +412,26 @@ const ProductModal = ({
               </Button>
             </div>
           </form>
+          {/* Adjust Stock Modal */}
+          {showAdjust && (
+            <AdjustStockModal
+              isOpen={showAdjust}
+              onClose={() => setShowAdjust(false)}
+              productId={product?.id || product?.product_id}
+              currentQoh={currentQoh}
+              onAdjusted={async () => {
+                try {
+                  const pid = product?.id || product?.product_id;
+                  if (!pid) return;
+                  const res = await fetch(`${API_ENDPOINTS.PRODUCT(pid)}/quantity-on-hand`);
+                  if (res.ok) {
+                    const qoh = await res.json();
+                    setCurrentQoh(Number(qoh) || 0);
+                  }
+                } catch {}
+              }}
+            />
+          )}
         </div>
       </div>
     </div>

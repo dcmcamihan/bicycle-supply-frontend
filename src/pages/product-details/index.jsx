@@ -7,6 +7,7 @@ import Breadcrumb from '../../components/ui/Breadcrumb';
 import ProductImageGallery from './components/ProductImageGallery';
 import ProductHeader from './components/ProductHeader';
 import ProductInfoTabs from './components/ProductInfoTabs';
+import AdjustStockModal from './components/AdjustStockModal';
 import ProductActions from './components/ProductActions';
 
 import Button from '../../components/ui/Button';
@@ -17,10 +18,14 @@ const ProductDetails = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [showMobileActions, setShowMobileActions] = useState(false);
+  const [showAdjust, setShowAdjust] = useState(false);
+  const [currentQoh, setCurrentQoh] = useState(0);
+  const [refreshCounter, setRefreshCounter] = useState(0);
 
   // Get id from URL query params
   const searchParams = new URLSearchParams(location.search);
   const productId = searchParams.get('id');
+  const openAdjust = searchParams.get('openAdjust') === '1';
 
   // Default/mock product data for fallback/extra fields
   const defaultProduct = {
@@ -46,6 +51,19 @@ const ProductDetails = () => {
       name: 'BikeWorld Distributors',code: 'BWD-001',contact: 'Sarah Johnson',phone: '+1 (555) 123-4567',email: 'orders@bikeworld.com'
     },
     createdAt: '2024-11-15',updatedAt: '2025-01-20'
+  };
+
+  const openAdjustStock = async () => {
+    try {
+      const pid = product?.id || productId;
+      if (!pid) return;
+      const res = await fetch(`${API_ENDPOINTS.PRODUCT(pid)}/quantity-on-hand`);
+      if (res.ok) {
+        const q = await res.json();
+        setCurrentQoh(Number(q) || 0);
+      }
+    } catch {}
+    setShowAdjust(true);
   };
 
   const [product, setProduct] = useState(defaultProduct);
@@ -110,6 +128,10 @@ const ProductDetails = () => {
       }
     };
     fetchProduct();
+    // Auto-open Adjust Stock if requested via query param
+    if (openAdjust) {
+      openAdjustStock();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productId]);
 
@@ -121,11 +143,60 @@ const ProductDetails = () => {
     setIsEditing(!isEditing);
   };
 
-  const handleSaveProduct = (updatedProduct) => {
-    setProduct(updatedProduct);
-    setIsEditing(false);
-    // In real app, this would make an API call to save the product
-    console.log('Product saved:', updatedProduct);
+  const handleSaveProduct = async (updatedProduct) => {
+    const pid = updatedProduct?.id || product?.id;
+    if (!pid) return;
+    try {
+      // Normalize price to two decimals
+      const normalizedPrice = updatedProduct.price != null ? Number(parseFloat(updatedProduct.price).toFixed(2)) : null;
+      // Normalize brand_id
+      const normalizedBrandId = updatedProduct.brand !== undefined && updatedProduct.brand !== ''
+        ? parseInt(updatedProduct.brand)
+        : (updatedProduct.brand_id ?? null);
+      const normalizedCategory = updatedProduct.category || updatedProduct.category_code || null;
+      if (!normalizedCategory) {
+        alert('Category is required');
+        return;
+      }
+      if (normalizedPrice === null || Number.isNaN(normalizedPrice)) {
+        alert('Price is required and must be a valid number');
+        return;
+      }
+      const MAX_DESC = 255;
+      const safeDescription = (updatedProduct.description || null);
+      const trimmedDescription = typeof safeDescription === 'string' ? safeDescription.slice(0, MAX_DESC) : safeDescription;
+      const payload = {
+        product_name: updatedProduct.name,
+        description: trimmedDescription,
+        barcode: updatedProduct.barcode || null,
+        category_code: normalizedCategory,
+        brand_id: Number.isNaN(normalizedBrandId) ? null : normalizedBrandId,
+        price: normalizedPrice,
+        reorder_level: updatedProduct.reorderPoint ? parseInt(updatedProduct.reorderPoint) : (product?.reorderPoint ?? 3),
+        weight: updatedProduct.weight === '' ? null : (updatedProduct.weight ?? null),
+        size: updatedProduct.size || null,
+        color: updatedProduct.color || null,
+        material: updatedProduct.material || null,
+        warranty_period: updatedProduct.warranty || null,
+        image_url: updatedProduct.image || updatedProduct.image_url || null
+      };
+      const res = await fetch(API_ENDPOINTS.PRODUCT(pid), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(errText || 'Failed to update product');
+      }
+      // Refresh product from backend
+      const refreshed = await (await fetch(API_ENDPOINTS.PRODUCT(pid))).json();
+      setProduct(prev => ({ ...prev, ...updatedProduct, id: refreshed.product_id ?? pid }));
+      setIsEditing(false);
+    } catch (e) {
+      console.error('Failed to save product:', e);
+      alert(`Failed to save product: ${e?.message || e}`);
+    }
   };
 
   const handleDuplicateProduct = (productToDuplicate) => {
@@ -212,6 +283,7 @@ const ProductDetails = () => {
                   isEditing={isEditing}
                   onToggleEdit={handleToggleEdit}
                   onSave={handleSaveProduct}
+                  key={refreshCounter}
                 />
               </div>
             </div>
@@ -225,6 +297,7 @@ const ProductDetails = () => {
                   onDuplicate={handleDuplicateProduct}
                   onDelete={handleDeleteProduct}
                   onAddToCart={handleAddToCart}
+                  onAdjustStock={openAdjustStock}
                 />
               </div>
             </div>
@@ -293,6 +366,29 @@ const ProductDetails = () => {
           </div>
         </div>
       </main>
+      {/* Adjust Stock Modal */}
+      {showAdjust && (
+        <AdjustStockModal
+          isOpen={showAdjust}
+          onClose={() => setShowAdjust(false)}
+          productId={product?.id || productId}
+          currentQoh={currentQoh}
+          onAdjusted={async () => {
+            try {
+              const pid = product?.id || productId;
+              if (pid) {
+                const res = await fetch(`${API_ENDPOINTS.PRODUCT(pid)}/quantity-on-hand`);
+                if (res.ok) {
+                  const q = await res.json();
+                  setCurrentQoh(Number(q) || 0);
+                }
+              }
+            } catch {}
+            setRefreshCounter((c) => c + 1);
+            setShowAdjust(false);
+          }}
+        />
+      )}
     </div>
   );
 };

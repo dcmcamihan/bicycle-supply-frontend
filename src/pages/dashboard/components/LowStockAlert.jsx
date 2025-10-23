@@ -1,58 +1,48 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
+import API_ENDPOINTS from '../../../config/api';
 
 const LowStockAlert = () => {
   const [dismissedAlerts, setDismissedAlerts] = useState(new Set());
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  const lowStockItems = [
-    {
-      id: 1,
-      name: "Trek Domane AL 2",
-      sku: "TRK-DOM-AL2-BLK",
-      currentStock: 2,
-      minStock: 5,
-      category: "Road Bikes",
-      supplier: "Trek Bicycle Corporation",
-      lastOrdered: "2023-08-15",
-      priority: "high"
-    },
-    {
-      id: 2,
-      name: "Specialized Helmet - Adult",
-      sku: "SPEC-HLM-ADT-RED",
-      currentStock: 3,
-      minStock: 10,
-      category: "Safety Gear",
-      supplier: "Specialized Equipment",
-      lastOrdered: "2023-08-10",
-      priority: "medium"
-    },
-    {
-      id: 3,
-      name: "Shimano Brake Pads",
-      sku: "SHIM-BRK-PAD-105",
-      currentStock: 1,
-      minStock: 15,
-      category: "Components",
-      supplier: "Shimano Inc",
-      lastOrdered: "2023-08-05",
-      priority: "high"
-    },
-    {
-      id: 4,
-      name: "Continental Tire 700x25c",
-      sku: "CONT-TIR-700-25",
-      currentStock: 4,
-      minStock: 12,
-      category: "Tires",
-      supplier: "Continental AG",
-      lastOrdered: "2023-08-12",
-      priority: "medium"
+  const fetchLowStock = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(API_ENDPOINTS.PRODUCTS);
+      const products = await res.json();
+      const mapped = await Promise.all(products.map(async (p) => {
+        let qoh = 0;
+        try {
+          const qres = await fetch(`${API_ENDPOINTS.PRODUCT(p.product_id)}/quantity-on-hand`);
+          if (qres.ok) qoh = await qres.json();
+        } catch {}
+        const min = p.reorder_level ?? 3;
+        const isLow = qoh <= min;
+        if (!isLow) return null;
+        return {
+          id: p.product_id,
+          name: p.product_name,
+          sku: String(p.product_id),
+          currentStock: Number(qoh) || 0,
+          minStock: Number(min) || 0,
+          category: p.category_code,
+          priority: qoh <= Math.max(1, Math.floor((min || 1) / 2)) ? 'high' : 'medium',
+        };
+      }));
+      setItems(mapped.filter(Boolean));
+    } catch {
+      setItems([]);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
-  const visibleAlerts = lowStockItems?.filter(item => !dismissedAlerts?.has(item?.id));
+  useEffect(() => { fetchLowStock(); }, []);
+
+  const visibleAlerts = items?.filter(item => !dismissedAlerts?.has(item?.id));
 
   const handleDismiss = (itemId) => {
     setDismissedAlerts(prev => new Set([...prev, itemId]));
@@ -89,7 +79,7 @@ const LowStockAlert = () => {
     }
   };
 
-  if (visibleAlerts?.length === 0) {
+  if (!loading && visibleAlerts?.length === 0) {
     return (
       <div className="bg-card border border-border rounded-lg p-6 shadow-subtle">
         <div className="flex items-center space-x-2 mb-4">
@@ -112,7 +102,7 @@ const LowStockAlert = () => {
           <Icon name="AlertTriangle" size={20} className="text-warning" />
           <h3 className="font-heading text-lg font-semibold text-foreground">Low Stock Alerts</h3>
           <span className="bg-warning/20 text-warning px-2 py-1 rounded-full font-data text-xs font-medium">
-            {visibleAlerts?.length}
+            {loading ? '...' : visibleAlerts?.length}
           </span>
         </div>
         <Button
@@ -120,9 +110,9 @@ const LowStockAlert = () => {
           size="sm"
           iconName="Settings"
           iconPosition="left"
-          onClick={() => console.log('Configure alerts')}
+          onClick={fetchLowStock}
         >
-          Configure
+          Refresh
         </Button>
       </div>
       <div className="space-y-3 max-h-96 overflow-y-auto">
@@ -158,7 +148,7 @@ const LowStockAlert = () => {
               
               <div className="flex items-center justify-between">
                 <span className="font-caption text-xs text-muted-foreground">
-                  {item?.category} • Last ordered: {item?.lastOrdered}
+                  {item?.category}
                 </span>
                 <div className="flex items-center space-x-2">
                   <Button

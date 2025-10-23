@@ -5,15 +5,103 @@ import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
 
-const ProductInfoTabs = ({ product, isEditing, onToggleEdit, onSave }) => {
+const ProductInfoTabs = ({ product, isEditing, onToggleEdit, onSave, refreshToken = 0 }) => {
   const [activeTab, setActiveTab] = useState('general');
   const [editedProduct, setEditedProduct] = useState(product);
   const [categoryLabel, setCategoryLabel] = useState('');
+  const [currentStock, setCurrentStock] = useState(0);
+  const [movements, setMovements] = useState([]);
+  const [loadingMovements, setLoadingMovements] = useState(false);
 
   // Sync editedProduct with product only when product changes, not on every render or edit toggle
   React.useEffect(() => {
     setEditedProduct(product);
   }, [product]);
+
+  // Fetch live current stock
+  React.useEffect(() => {
+    const fetchQoh = async () => {
+      if (!product?.id && !product?.product_id) return;
+      const pid = product?.id || product?.product_id;
+      try {
+        const res = await fetch(`${API_ENDPOINTS.PRODUCT(pid)}/quantity-on-hand`);
+        if (res.ok) {
+          const qoh = await res.json();
+          setCurrentStock(Number(qoh) || 0);
+        }
+      } catch {}
+    };
+    fetchQoh();
+  }, [product?.id, product?.product_id, refreshToken]);
+
+
+  // Fetch stock movement history (Supplies + Sales)
+  React.useEffect(() => {
+    const loadMovements = async () => {
+      if (!product?.id && !product?.product_id) return;
+      const pid = Number(product?.id || product?.product_id);
+      setLoadingMovements(true);
+      try {
+        const all = [];
+        // Sales -> decreases
+        try {
+          const salesRes = await fetch(API_ENDPOINTS.SALES);
+          if (salesRes.ok) {
+            const sales = await salesRes.json();
+            for (const sale of sales) {
+              try {
+                const detRes = await fetch(API_ENDPOINTS.SALE_DETAILS(sale.sale_id));
+                if (!detRes.ok) continue;
+                const details = await detRes.json();
+                for (const d of details) {
+                  if (Number(d.product_id) === pid) {
+                    all.push({
+                      date: sale.sale_date ? new Date(sale.sale_date).toISOString().slice(0,10) : '',
+                      type: 'Sale',
+                      quantity: -(Number(d.quantity_sold) || 0)
+                    });
+                  }
+                }
+              } catch {}
+            }
+          }
+        } catch {}
+
+        // Supplies -> increases
+        try {
+          const supRes = await fetch(API_ENDPOINTS.SUPPLIES);
+          if (supRes.ok) {
+            const supplies = await supRes.json();
+            for (const sup of supplies) {
+              try {
+                const sdetRes = await fetch(API_ENDPOINTS.SUPPLY_DETAILS_BY_SUPPLY(sup.supply_id));
+                if (!sdetRes.ok) continue;
+                const sdetails = await sdetRes.json();
+                for (const sd of sdetails) {
+                  if (Number(sd.product_id) === pid) {
+                    all.push({
+                      date: sup.supply_date ? new Date(sup.supply_date).toISOString().slice(0,10) : '',
+                      type: 'Restock',
+                      quantity: Number(sd.quantity_supplied) || 0
+                    });
+                  }
+                }
+              } catch {}
+            }
+          }
+        } catch {}
+
+        // Sort movements by date desc (newest first)
+        all.sort((a,b) => new Date(b.date) - new Date(a.date));
+        setMovements(all);
+      } catch {
+        setMovements([]);
+      } finally {
+        setLoadingMovements(false);
+      }
+    };
+    loadMovements();
+  }, [product?.id, product?.product_id]);
 
   const tabs = [
     { id: 'general', label: 'General Info', icon: 'Info' },
@@ -103,6 +191,7 @@ const ProductInfoTabs = ({ product, isEditing, onToggleEdit, onSave }) => {
         />
       </div>
 
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {isEditing ? (
           <Select
@@ -175,6 +264,7 @@ const ProductInfoTabs = ({ product, isEditing, onToggleEdit, onSave }) => {
           <span className="text-sm font-body text-foreground">Featured Product</span>
         </label>
       </div>
+
     </div>
   );
 
@@ -188,9 +278,9 @@ const ProductInfoTabs = ({ product, isEditing, onToggleEdit, onSave }) => {
         <Input
           label="Current Stock"
           type="number"
-          value={editedProduct.stock}
-          onChange={(e) => handleInputChange('stock', parseInt(e.target.value))}
-          disabled={!isEditing}
+          value={currentStock}
+          onChange={() => {}}
+          disabled
           required
           min="0"
         />
@@ -202,14 +292,7 @@ const ProductInfoTabs = ({ product, isEditing, onToggleEdit, onSave }) => {
           disabled={!isEditing}
           min="0"
         />
-        <Input
-          label="Max Stock Level"
-          type="number"
-          value={editedProduct.maxStock || 100}
-          onChange={(e) => handleInputChange('maxStock', parseInt(e.target.value))}
-          disabled={!isEditing}
-          min="0"
-        />
+        <div />
       </div>
 
       <div className="bg-card border border-border rounded-lg p-4">
@@ -218,37 +301,111 @@ const ProductInfoTabs = ({ product, isEditing, onToggleEdit, onSave }) => {
           <span>Stock Movement History</span>
         </h4>
         <div className="space-y-2">
-          {[
-            { date: '2025-01-20', type: 'Sale', quantity: -2, balance: editedProduct.stock },
-            { date: '2025-01-18', type: 'Restock', quantity: +10, balance: editedProduct.stock + 2 },
-            { date: '2025-01-15', type: 'Sale', quantity: -1, balance: editedProduct.stock - 8 }
-          ].map((movement, index) => (
-            <div key={index} className="flex items-center justify-between py-2 border-b border-border last:border-b-0">
-              <div className="flex items-center space-x-3">
-                <Icon 
-                  name={movement.type === 'Sale' ? 'Minus' : 'Plus'} 
-                  size={14} 
-                  className={movement.type === 'Sale' ? 'text-destructive' : 'text-success'}
-                />
-                <div>
-                  <span className="text-sm font-body text-foreground">{movement.type}</span>
-                  <span className="text-xs text-muted-foreground ml-2">{movement.date}</span>
+          {loadingMovements ? (
+            <p className="font-caption text-sm text-muted-foreground">Loading movements...</p>
+          ) : movements.length === 0 ? (
+            <p className="font-caption text-sm text-muted-foreground">No movement history available.</p>
+          ) : (
+            movements.map((movement, index) => (
+              <div key={index} className="flex items-center justify-between py-2 border-b border-border last:border-b-0">
+                <div className="flex items-center space-x-3">
+                  <Icon 
+                    name={movement.type === 'Sale' || movement.type === 'Return Out' ? 'Minus' : 'Plus'} 
+                    size={14} 
+                    className={(movement.type === 'Sale' || movement.type === 'Return Out') ? 'text-destructive' : 'text-success'}
+                  />
+                  <div>
+                    <span className="text-sm font-body text-foreground">{movement.type}</span>
+                    <span className="text-xs text-muted-foreground ml-2">{movement.date}</span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className={`text-sm font-semibold ${
+                    movement.quantity > 0 ? 'text-success' : 'text-destructive'
+                  }`}>
+                    {movement.quantity > 0 ? '+' : ''}{movement.quantity}
+                  </span>
+                  {typeof movement.balance !== 'undefined' && (
+                    <span className="text-xs text-muted-foreground ml-2">Bal: {movement.balance}</span>
+                  )}
                 </div>
               </div>
-              <div className="text-right">
-                <span className={`text-sm font-semibold ${
-                  movement.quantity > 0 ? 'text-success' : 'text-destructive'
-                }`}>
-                  {movement.quantity > 0 ? '+' : ''}{movement.quantity}
-                </span>
-                <span className="text-xs text-muted-foreground ml-2">Bal: {movement.balance}</span>
-              </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </div>
     </div>
   );
+
+  // Supplier info and contacts
+  const [supplierInfo, setSupplierInfo] = React.useState(null);
+  const [supplierContacts, setSupplierContacts] = React.useState([]);
+  const [poHistory, setPoHistory] = React.useState([]);
+
+  React.useEffect(() => {
+    const fetchSupplierData = async () => {
+      const supplierId = product?.supplier_id || editedProduct?.supplier_id;
+      if (!supplierId) return;
+      try {
+        const sres = await fetch(API_ENDPOINTS.SUPPLIER(supplierId));
+        if (sres.ok) {
+          const sdata = await sres.json();
+          setSupplierInfo(sdata);
+        }
+      } catch {}
+      // Contacts (if API exists)
+      try {
+        const cres = await fetch(`${API_ENDPOINTS.SUPPLIER(supplierId)}/contacts`);
+        if (cres.ok) {
+          const cdata = await cres.json();
+          setSupplierContacts(Array.isArray(cdata) ? cdata : []);
+        } else {
+          setSupplierContacts([]);
+        }
+      } catch {
+        setSupplierContacts([]);
+      }
+    };
+    fetchSupplierData();
+  }, [product?.supplier_id, editedProduct?.supplier_id]);
+
+  // Build purchase order history from supplies + supply_details
+  React.useEffect(() => {
+    const loadPoHistory = async () => {
+      const pid = Number(product?.id || product?.product_id);
+      if (!pid) return;
+      try {
+        const out = [];
+        const supRes = await fetch(API_ENDPOINTS.SUPPLIES);
+        if (supRes.ok) {
+          const supplies = await supRes.json();
+          for (const sup of supplies) {
+            try {
+              const detRes = await fetch(API_ENDPOINTS.SUPPLY_DETAILS_BY_SUPPLY(sup.supply_id));
+              if (!detRes.ok) continue;
+              const dets = await detRes.json();
+              const forThisProduct = dets.filter(d => Number(d.product_id) === pid);
+              if (forThisProduct.length > 0) {
+                const totalQty = forThisProduct.reduce((sum, d) => sum + (Number(d.quantity_supplied) || 0), 0);
+                out.push({
+                  poNumber: `SUP-${sup.supply_id}`,
+                  date: sup.supply_date ? new Date(sup.supply_date).toISOString().slice(0,10) : '',
+                  quantity: totalQty,
+                  status: sup.status || 'Received'
+                });
+              }
+            } catch {}
+          }
+        }
+        // Sort newest first
+        out.sort((a,b) => new Date(b.date) - new Date(a.date));
+        setPoHistory(out);
+      } catch {
+        setPoHistory([]);
+      }
+    };
+    loadPoHistory();
+  }, [product?.id, product?.product_id]);
 
   const renderSupplier = () => (
     <div className="space-y-6">
@@ -256,58 +413,50 @@ const ProductInfoTabs = ({ product, isEditing, onToggleEdit, onSave }) => {
         <Input
           label="Supplier Name"
           type="text"
-          value={editedProduct.supplier?.name || 'BikeWorld Distributors'}
-          onChange={(e) => handleInputChange('supplier', {
-            ...editedProduct.supplier,
-            name: e.target.value
-          })}
-          disabled={!isEditing}
+          value={supplierInfo?.supplier_name || product?.supplier_name || ''}
+          onChange={() => {}}
+          disabled
         />
         <Input
           label="Supplier Code"
           type="text"
-          value={editedProduct.supplier?.code || 'BWD-001'}
-          onChange={(e) => handleInputChange('supplier', {
-            ...editedProduct.supplier,
-            code: e.target.value
-          })}
-          disabled={!isEditing}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Input
-          label="Contact Person"
-          type="text"
-          value={editedProduct.supplier?.contact || 'Sarah Johnson'}
-          onChange={(e) => handleInputChange('supplier', {
-            ...editedProduct.supplier,
-            contact: e.target.value
-          })}
-          disabled={!isEditing}
-        />
-        <Input
-          label="Phone Number"
-          type="tel"
-          value={editedProduct.supplier?.phone || '+1 (555) 123-4567'}
-          onChange={(e) => handleInputChange('supplier', {
-            ...editedProduct.supplier,
-            phone: e.target.value
-          })}
-          disabled={!isEditing}
+          value={String(product?.supplier_id || supplierInfo?.supplier_id || '')}
+          onChange={() => {}}
+          disabled
         />
       </div>
 
       <Input
-        label="Email Address"
-        type="email"
-        value={editedProduct.supplier?.email || 'orders@bikeworld.com'}
-        onChange={(e) => handleInputChange('supplier', {
-          ...editedProduct.supplier,
-          email: e.target.value
-        })}
-        disabled={!isEditing}
+        label="Supplier Address"
+        type="text"
+        value={supplierInfo?.supplier_address || product?.supplier_address || ''}
+        onChange={() => {}}
+        disabled
       />
+
+      <div className="bg-card border border-border rounded-lg p-4">
+        <h4 className="font-body font-semibold text-sm text-foreground mb-3 flex items-center space-x-2">
+          <Icon name="AddressBook" size={16} />
+          <span>Supplier Contacts</span>
+        </h4>
+        {supplierContacts.length === 0 ? (
+          <p className="font-caption text-sm text-muted-foreground">No contacts available.</p>
+        ) : (
+          <div className="space-y-2">
+            {supplierContacts.map((c, idx) => (
+              <div key={idx} className="flex items-center justify-between py-2 border-b border-border last:border-b-0">
+                <div className="min-w-0">
+                  <span className="text-sm font-body text-foreground">{c.contact_value || c.value}</span>
+                  <span className="text-xs text-muted-foreground ml-2">{c.contact_type || c.type}</span>
+                </div>
+                {c.is_primary ? (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">Primary</span>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       <div className="bg-card border border-border rounded-lg p-4">
         <h4 className="font-body font-semibold text-sm text-foreground mb-3 flex items-center space-x-2">
@@ -315,22 +464,22 @@ const ProductInfoTabs = ({ product, isEditing, onToggleEdit, onSave }) => {
           <span>Purchase Order History</span>
         </h4>
         <div className="space-y-2">
-          {[
-            { poNumber: 'PO-2025-001', date: '2025-01-15', quantity: 10, status: 'Delivered' },
-            { poNumber: 'PO-2024-089', date: '2024-12-20', quantity: 15, status: 'Delivered' },
-            { poNumber: 'PO-2024-067', date: '2024-11-28', quantity: 8, status: 'Delivered' }
-          ].map((po, index) => (
-            <div key={index} className="flex items-center justify-between py-2 border-b border-border last:border-b-0">
-              <div>
-                <span className="text-sm font-body text-foreground">{po.poNumber}</span>
-                <span className="text-xs text-muted-foreground ml-2">{po.date}</span>
+          {poHistory.length === 0 ? (
+            <p className="font-caption text-sm text-muted-foreground">No purchase orders found.</p>
+          ) : (
+            poHistory.map((po, index) => (
+              <div key={index} className="flex items-center justify-between py-2 border-b border-border last:border-b-0">
+                <div>
+                  <span className="text-sm font-body text-foreground">{po.poNumber}</span>
+                  <span className="text-xs text-muted-foreground ml-2">{po.date}</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-sm text-foreground">Qty: {po.quantity}</span>
+                  <span className="text-xs text-success ml-2">{po.status}</span>
+                </div>
               </div>
-              <div className="text-right">
-                <span className="text-sm text-foreground">Qty: {po.quantity}</span>
-                <span className="text-xs text-success ml-2">{po.status}</span>
-              </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </div>
     </div>

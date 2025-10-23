@@ -1,86 +1,181 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
+import { useNavigate } from 'react-router-dom';
+import API_ENDPOINTS from '../../../config/api';
 
 const ActivityFeed = () => {
   const [filter, setFilter] = useState('all');
+  const [activities, setActivities] = useState([]);
+  const navigate = useNavigate();
 
-  const activities = [
-    {
-      id: 1,
-      type: 'sale',
-      title: 'New sale completed',
-      description: 'Trek Mountain Bike sold to Sarah Johnson',
-      amount: '₱1,299.99',
-      timestamp: new Date(Date.now() - 300000),
-      user: 'John Doe',
-      icon: 'ShoppingCart',
-      color: 'text-success bg-success/10'
-    },
-    {
-      id: 2,
-      type: 'inventory',
-      title: 'Stock updated',
-      description: 'Added 15 units of Specialized Helmets',
-      timestamp: new Date(Date.now() - 900000),
-      user: 'Mike Chen',
-      icon: 'Package',
-      color: 'text-primary bg-primary/10'
-    },
-    {
-      id: 3,
-      type: 'alert',
-      title: 'Low stock warning',
-      description: 'Shimano Brake Pads running low (1 unit left)',
-      timestamp: new Date(Date.now() - 1800000),
-      user: 'System',
-      icon: 'AlertTriangle',
-      color: 'text-warning bg-warning/10'
-    },
-    {
-      id: 4,
-      type: 'return',
-      title: 'Return processed',
-      description: 'Road bike returned by Emily Davis',
-      amount: '-₱899.99',
-      timestamp: new Date(Date.now() - 3600000),
-      user: 'Lisa Wang',
-      icon: 'RotateCcw',
-      color: 'text-accent bg-accent/10'
-    },
-    {
-      id: 5,
-      type: 'maintenance',
-      title: 'Service completed',
-      description: 'Bike tune-up for customer #1234',
-      amount: '₱45.00',
-      timestamp: new Date(Date.now() - 7200000),
-      user: 'Tom Wilson',
-      icon: 'Wrench',
-      color: 'text-secondary bg-secondary/10'
-    },
-    {
-      id: 6,
-      type: 'inventory',
-      title: 'New product added',
-      description: 'Electric Bike Model X added to catalog',
-      timestamp: new Date(Date.now() - 10800000),
-      user: 'Sarah Kim',
-      icon: 'Plus',
-      color: 'text-primary bg-primary/10'
-    }
-  ];
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const currency = new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', minimumFractionDigits: 0 });
+        const productNameCache = new Map();
+        const getProductName = async (pid) => {
+          const k = Number(pid);
+          if (productNameCache.has(k)) return productNameCache.get(k);
+          try {
+            const r = await fetch(API_ENDPOINTS.PRODUCT(k));
+            if (r.ok) {
+              const p = await r.json();
+              const name = p.product_name || `#${k}`;
+              productNameCache.set(k, name);
+              return name;
+            }
+          } catch {}
+          return `#${k}`;
+        };
+
+        const out = [];
+
+        try {
+          const salesRes = await fetch(API_ENDPOINTS.SALES);
+          if (salesRes.ok) {
+            const sales = await salesRes.json();
+            for (const sale of sales) {
+              const saleId = sale?.sale_id || sale?.id;
+              const ts = sale?.sale_date || sale?.date || sale?.created_at;
+              let total = Number(sale?.total_amount ?? 0);
+              try {
+                const detRes = await fetch(API_ENDPOINTS.SALE_DETAILS(saleId));
+                if (detRes.ok) {
+                  const details = await detRes.json();
+                  let names = [];
+                  if (!total) {
+                    for (const d of details) {
+                      const nm = await getProductName(d.product_id);
+                      names.push(nm);
+                      const unit = Number(d?.unit_price ?? 0);
+                      const qty = Number(d?.quantity_sold ?? d?.quantity ?? 0);
+                      total += unit * qty;
+                    }
+                  } else {
+                    for (const d of details) {
+                      const nm = await getProductName(d.product_id);
+                      names.push(nm);
+                    }
+                  }
+                  out.push({
+                    id: `sale-${saleId}`,
+                    type: 'sale',
+                    title: 'Sale completed',
+                    description: names.slice(0, 3).join(', '),
+                    amount: currency.format(total),
+                    timestamp: new Date(ts),
+                    user: sale?.cashier_name || 'POS',
+                    icon: 'ShoppingCart',
+                    color: 'text-success bg-success/10'
+                  });
+                }
+              } catch {}
+            }
+          }
+        } catch {}
+
+        try {
+          const sRes = await fetch(API_ENDPOINTS.SUPPLIES);
+          if (sRes.ok) {
+            const supplies = await sRes.json();
+            for (const sup of supplies) {
+              const supId = sup?.supply_id || sup?.id;
+              const ts = sup?.supply_date || sup?.date || sup?.created_at;
+              try {
+                const sdRes = await fetch(API_ENDPOINTS.SUPPLY_DETAILS_BY_SUPPLY(supId));
+                if (sdRes.ok) {
+                  const sds = await sdRes.json();
+                  let names = [];
+                  let qty = 0;
+                  for (const d of sds) {
+                    const nm = await getProductName(d.product_id);
+                    names.push(nm);
+                    qty += Number(d?.quantity_supplied ?? d?.quantity ?? 0);
+                  }
+                  out.push({
+                    id: `supply-${supId}`,
+                    type: 'inventory',
+                    title: 'Stock received',
+                    description: `${names.slice(0, 3).join(', ')} (+${qty})`,
+                    timestamp: new Date(ts),
+                    user: sup?.supplier_name || 'Supplier',
+                    icon: 'Package',
+                    color: 'text-primary bg-primary/10'
+                  });
+                }
+              } catch {}
+            }
+          }
+        } catch {}
+
+        try {
+          const soRes = await fetch(API_ENDPOINTS.STOCKOUTS);
+          if (soRes.ok) {
+            const stockouts = await soRes.json();
+            for (const so of stockouts) {
+              const soId = so?.stockout_id || so?.id;
+              const ts = so?.stockout_date || so?.date || so?.created_at;
+              const pid = Number(so?.product_id);
+              const removed = Number(so?.quantity_removed ?? 0);
+              if (pid && removed) {
+                const nm = await getProductName(pid);
+                out.push({
+                  id: `stockout-${soId}`,
+                  type: 'inventory',
+                  title: 'Inventory adjustment',
+                  description: `${nm} (-${Math.abs(removed)})`,
+                  timestamp: new Date(ts),
+                  user: so?.manager_name || 'Manager',
+                  icon: 'Edit',
+                  color: 'text-warning bg-warning/10'
+                });
+                continue;
+              }
+              try {
+                if (API_ENDPOINTS.STOCKOUT_DETAILS_BY_STOCKOUT) {
+                  const detRes = await fetch(API_ENDPOINTS.STOCKOUT_DETAILS_BY_STOCKOUT(soId));
+                  if (detRes.ok) {
+                    const dets = await detRes.json();
+                    for (const d of dets) {
+                      const nm = await getProductName(d.product_id);
+                      out.push({
+                        id: `stockout-${soId}-${d.product_id}`,
+                        type: 'inventory',
+                        title: 'Inventory adjustment',
+                        description: `${nm} (-${Math.abs(Number(d?.quantity_removed ?? d?.quantity ?? 0))})`,
+                        timestamp: new Date(ts),
+                        user: so?.manager_name || 'Manager',
+                        icon: 'Edit',
+                        color: 'text-warning bg-warning/10'
+                      });
+                    }
+                  }
+                }
+              } catch {}
+            }
+          }
+        } catch {}
+
+        out.sort((a, b) => b.timestamp - a.timestamp);
+        setActivities(out.slice(0, 25));
+      } catch {
+        setActivities([]);
+      }
+    };
+    load();
+  }, []);
 
   const filterOptions = [
     { value: 'all', label: 'All Activities', icon: 'Activity' },
     { value: 'sale', label: 'Sales', icon: 'ShoppingCart' },
-    { value: 'inventory', label: 'Inventory', icon: 'Package' },
-    { value: 'alert', label: 'Alerts', icon: 'AlertTriangle' }
+    { value: 'inventory', label: 'Inventory', icon: 'Package' }
   ];
 
-  const filteredActivities = filter === 'all' 
-    ? activities 
-    : activities?.filter(activity => activity?.type === filter);
+  const filteredActivities = useMemo(() => {
+    if (filter === 'all') return activities;
+    return activities?.filter(a => a?.type === filter);
+  }, [activities, filter]);
 
   const formatTime = (timestamp) => {
     const now = new Date();
@@ -187,7 +282,7 @@ const ActivityFeed = () => {
           fullWidth
           iconName="ExternalLink"
           iconPosition="right"
-          onClick={() => console.log('View full activity log')}
+          onClick={() => navigate('/sales-reports')}
         >
           View Full Activity Log
         </Button>

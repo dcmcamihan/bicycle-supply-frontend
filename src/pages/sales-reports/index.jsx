@@ -9,6 +9,10 @@ import SalesChart from './components/SalesChart';
 import CategoryChart from './components/CategoryChart';
 import TransactionTable from './components/TransactionTable';
 import InsightsPanel from './components/InsightsPanel';
+import BestSellers from './components/BestSellers';
+import PaymentDistribution from './components/PaymentDistribution';
+import StaffPerformance from './components/StaffPerformance';
+import PeakHours from './components/PeakHours';
 
 const SalesReports = () => {
   // Helper to get date range filter
@@ -169,20 +173,68 @@ const SalesReports = () => {
         // KPI calculations
         let totalSales = 0;
         const productCountMap = new Map();
+        // Caches for further reports
+        const saleAmountCache = new Map(); // sale_id -> totalAmount
+        const productAgg = new Map(); // product_id -> { name, quantity, sales }
+        const paymentAgg = new Map(); // method -> { count, amount }
+        const staffAgg = new Map(); // cashier -> { name, count, amount }
+        const hourAgg = new Map(); // hour(0-23) -> { count, amount }
+
         for (const sale of filteredSales) {
           try {
-            const { details } = await getSaleDetailsAndAmount(sale.sale_id);
+            const { details, totalAmount, itemsCount } = await getSaleDetailsAndAmount(sale.sale_id);
+            saleAmountCache.set(sale.sale_id, totalAmount);
             for (const detail of details) {
               const prod = await fetchJson(API_ENDPOINTS.PRODUCT(detail.product_id));
               const price = parseFloat(prod.price) || 0;
-              totalSales += price * (detail.quantity_sold || 0);
+              const line = price * (detail.quantity_sold || 0);
+              totalSales += line;
               if (detail.product_id) {
                 productCountMap.set(
                   detail.product_id,
                   (productCountMap.get(detail.product_id) || 0) + (detail.quantity_sold || 0)
                 );
+                const existing = productAgg.get(detail.product_id) || { name: prod.product_name, quantity: 0, sales: 0 };
+                existing.quantity += (detail.quantity_sold || 0);
+                existing.sales += line;
+                productAgg.set(detail.product_id, existing);
               }
             }
+            // Payment aggregation
+            try {
+              const payData = await fetchJson(API_ENDPOINTS.SALE_PAYMENT_TYPES_BY_SALE(sale.sale_id));
+              let code = '';
+              if (Array.isArray(payData) && payData.length > 0) code = payData[0].payment_method_code || '';
+              else if (payData.payment_method_code) code = payData.payment_method_code;
+              let methodLabel = code;
+              if (code) {
+                try {
+                  const method = await fetchJson(API_ENDPOINTS.PAYMENT_METHOD(code));
+                  methodLabel = method.name || code;
+                } catch {}
+              }
+              const existingPay = paymentAgg.get(methodLabel) || { method: methodLabel, count: 0, amount: 0 };
+              existingPay.count += 1;
+              existingPay.amount += (saleAmountCache.get(sale.sale_id) || 0);
+              paymentAgg.set(methodLabel, existingPay);
+            } catch {}
+
+            // Staff aggregation
+            let staffName = '';
+            try {
+              staffName = await getStaffName(sale.cashier);
+            } catch { staffName = `Employee #${sale.cashier}`; }
+            const existingStaff = staffAgg.get(sale.cashier) || { cashierId: sale.cashier, staff: staffName, count: 0, amount: 0 };
+            existingStaff.count += 1;
+            existingStaff.amount += (saleAmountCache.get(sale.sale_id) || 0);
+            staffAgg.set(sale.cashier, existingStaff);
+
+            // Peak hours aggregation
+            const hour = new Date(sale.sale_date).getHours();
+            const existingHour = hourAgg.get(hour) || { hour, count: 0, amount: 0 };
+            existingHour.count += 1;
+            existingHour.amount += (saleAmountCache.get(sale.sale_id) || 0);
+            hourAgg.set(hour, existingHour);
           } catch {}
         }
         const avgOrder = filteredSales.length > 0 ? totalSales / filteredSales.length : 0;
@@ -261,9 +313,23 @@ const SalesReports = () => {
         }));
         setTransactionsData(mapped);
         setTransactionsError(null);
+
+        // Set new datasets
+        const best = Array.from(productAgg.values()).sort((a,b) => b.quantity - a.quantity).slice(0, 10);
+        setBestSellers(best);
+        const pay = Array.from(paymentAgg.values()).sort((a,b) => b.amount - a.amount);
+        setPaymentDistribution(pay);
+        const staff = Array.from(staffAgg.values()).sort((a,b) => b.amount - a.amount);
+        setStaffPerformance(staff);
+        const hours = Array.from(hourAgg.values()).sort((a,b) => a.hour - b.hour);
+        setPeakHours(hours);
       } catch (error) {
         setTransactionsError(error.message);
         setTransactionsData([]);
+        setBestSellers([]);
+        setPaymentDistribution([]);
+        setStaffPerformance([]);
+        setPeakHours([]);
       } finally {
         setLoadingTransactions(false);
       }
@@ -359,6 +425,12 @@ const SalesReports = () => {
   const [transactionsData, setTransactionsData] = useState([]);
   const [loadingTransactions, setLoadingTransactions] = useState(true);
   const [transactionsError, setTransactionsError] = useState(null);
+
+  // New report datasets
+  const [bestSellers, setBestSellers] = useState([]);
+  const [paymentDistribution, setPaymentDistribution] = useState([]);
+  const [staffPerformance, setStaffPerformance] = useState([]);
+  const [peakHours, setPeakHours] = useState([]);
 
   // ...existing code...
 
@@ -456,14 +528,17 @@ const SalesReports = () => {
           {/* Main Content Grid */}
           <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
             {/* Transaction Table */}
-            <div className="xl:col-span-3">
+            <div className="xl:col-span-4">
               <TransactionTable transactions={transactionsData} key={JSON.stringify(transactionsData)} />
             </div>
+          </div>
 
-            {/* Insights Panel */}
-            <div className="xl:col-span-1">
-              <InsightsPanel insights={insightsData} />
-            </div>
+          {/* Additional Reports */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            <BestSellers data={bestSellers} />
+            <PaymentDistribution data={paymentDistribution} />
+            <StaffPerformance data={staffPerformance} />
+            <PeakHours data={peakHours} />
           </div>
 
           {/* Loading Overlay */}
