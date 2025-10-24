@@ -12,6 +12,7 @@ import InventorySidebar from './components/InventorySidebar';
 import ProductModal from './components/ProductModal';
 import MobileInventoryCard from './components/MobileInventoryCard';
 import API_ENDPOINTS from '../../config/api';
+import CreatePurchaseOrderModal from '../product-details/components/CreatePurchaseOrderModal';
 
 const InventoryManagement = () => {
   // Brands state
@@ -61,6 +62,9 @@ const InventoryManagement = () => {
   const [editingProduct, setEditingProduct] = useState(null);
   const [isMobile, setIsMobile] = useState(false);
   const location = useLocation();
+  const [showPOModal, setShowPOModal] = useState(false);
+  const [poProductId, setPoProductId] = useState(null);
+  const [poSupplierId, setPoSupplierId] = useState(null);
 
   // Products state
   const [rawProducts, setRawProducts] = useState([]);
@@ -641,8 +645,11 @@ const InventoryManagement = () => {
   };
 
   const handleReorderClick = (item) => {
-    console.log('Reordering item:', item);
-    alert(`Reorder dialog would open for ${item?.name}`);
+    const pid = Number(item?.id);
+    const supplierEntry = productSupplierMap.get(pid);
+    setPoProductId(pid);
+    setPoSupplierId(supplierEntry?.supplier_id || null);
+    setShowPOModal(true);
   };
 
   const handleViewMovements = () => {
@@ -769,6 +776,22 @@ const InventoryManagement = () => {
         suppliers={mockSuppliers}
         categories={categories}
         brands={brands}
+      />
+      {/* Create PO Modal (Low Stock Reorder) */}
+      <CreatePurchaseOrderModal
+        isOpen={showPOModal}
+        onClose={() => setShowPOModal(false)}
+        productId={poProductId}
+        supplierId={poSupplierId}
+        onCreated={async () => {
+          // Refresh products (QOH) after creating PO
+          try {
+            const response = await fetch(API_ENDPOINTS.PRODUCTS);
+            const data = await response.json();
+            setRawProducts(data);
+          } catch {}
+          setShowPOModal(false);
+        }}
       />
     </div>
   );

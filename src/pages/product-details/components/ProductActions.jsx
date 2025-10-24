@@ -206,6 +206,7 @@ const ProductActions = ({ product, onEdit, onDelete, onAddToCart, onAdjustStock,
         isOpen={showPO}
         onClose={() => setShowPO(false)}
         productId={product?.id}
+        supplierId={product?.supplier_id}
         onCreated={() => setShowPO(false)}
       />
       <SalesHistoryModal
