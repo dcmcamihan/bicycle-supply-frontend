@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 
-const ProductActions = ({ product, onEdit, onDuplicate, onDelete, onAddToCart, onAdjustStock }) => {
+const ProductActions = ({ product, onEdit, onDelete, onAddToCart, onAdjustStock }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -14,18 +14,6 @@ const ProductActions = ({ product, onEdit, onDuplicate, onDelete, onAddToCart, o
       setShowDeleteConfirm(false);
     } catch (error) {
       console.error('Delete failed:', error);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleDuplicate = async () => {
-    setIsProcessing(true);
-    try {
-      await new Promise(resolve => setTimeout(resolve, 800)); // Simulate API call
-      onDuplicate(product);
-    } catch (error) {
-      console.error('Duplicate failed:', error);
     } finally {
       setIsProcessing(false);
     }
@@ -66,18 +54,6 @@ const ProductActions = ({ product, onEdit, onDuplicate, onDelete, onAddToCart, o
             fullWidth
           >
             Edit Product
-          </Button>
-          
-          <Button
-            variant="outline"
-            onClick={handleDuplicate}
-            iconName="Copy"
-            iconPosition="left"
-            iconSize={16}
-            fullWidth
-            loading={isProcessing}
-          >
-            Duplicate Product
           </Button>
         </div>
       </div>

@@ -104,16 +104,7 @@ const ProductHeader = ({ product, isEditing, onToggleEdit, onDuplicate, onDelete
             {isEditing ? 'Save' : 'Edit'}
           </Button>
           
-          <Button
-            variant="outline"
-            onClick={onDuplicate}
-            iconName="Copy"
-            iconPosition="left"
-            iconSize={16}
-            className="w-full sm:w-auto"
-          >
-            Duplicate
-          </Button>
+          
           
           <Button
             variant="destructive"

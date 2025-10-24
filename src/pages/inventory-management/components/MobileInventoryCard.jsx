@@ -164,17 +164,7 @@ const MobileInventoryCard = ({
               Edit
             </Button>
             
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onDuplicate(product)}
-              iconName="Copy"
-              iconPosition="left"
-              iconSize={16}
-              className="flex-1"
-            >
-              Duplicate
-            </Button>
+            
             
             <Button
               variant="destructive"

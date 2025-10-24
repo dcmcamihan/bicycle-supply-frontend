@@ -23,6 +23,103 @@ const TransactionTable = ({ transactions }) => {
 
   const tableTransactions = transactions || [];
 
+  // Modal state for view/print
+  const [showModal, setShowModal] = useState(false);
+  const [modalLoading, setModalLoading] = useState(false);
+  const [modalError, setModalError] = useState('');
+  const [modalData, setModalData] = useState(null); // { sale, items: [{name, qty, price, total}], totals }
+
+  const fetchJson = async (url) => {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  };
+
+  const loadTransactionDetails = async (saleId) => {
+    setModalLoading(true);
+    setModalError('');
+    try {
+      const sale = await fetchJson(`${API_ENDPOINTS.SALES}/${saleId}`);
+      const details = await fetchJson(API_ENDPOINTS.SALE_DETAILS(saleId));
+      const items = [];
+      let grandTotal = 0;
+      for (const d of details) {
+        try {
+          const p = await fetchJson(API_ENDPOINTS.PRODUCT(d.product_id));
+          const price = Number(p.price || 0);
+          const qty = Number(d.quantity_sold || d.quantity || 0);
+          const total = price * qty;
+          grandTotal += total;
+          items.push({ name: p.product_name, qty, price, total });
+        } catch {
+          const qty = Number(d.quantity_sold || d.quantity || 0);
+          items.push({ name: `Product #${d.product_id}`, qty, price: 0, total: 0 });
+        }
+      }
+      setModalData({ sale, items, grandTotal });
+    } catch (e) {
+      setModalError(e?.message || 'Failed to load transaction');
+      setModalData(null);
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const handleView = async (tx) => {
+    setShowModal(true);
+    await loadTransactionDetails(tx.id);
+  };
+
+  const handlePrint = async (tx) => {
+    // Ensure data is loaded
+    if (!modalData || modalData?.sale?.sale_id !== tx.id) {
+      await loadTransactionDetails(tx.id);
+    }
+    const data = modalData;
+    if (!data) return;
+    const w = window.open('', 'PRINT', 'height=650,width=900,top=100,left=150');
+    if (!w) return;
+    const rows = (data.items || []).map(i => `
+      <tr>
+        <td style="padding:6px;border:1px solid #e5e7eb;">${i.name}</td>
+        <td style="padding:6px;border:1px solid #e5e7eb;text-align:right;">${i.qty}</td>
+        <td style="padding:6px;border:1px solid #e5e7eb;text-align:right;">₱${i.price.toLocaleString()}</td>
+        <td style="padding:6px;border:1px solid #e5e7eb;text-align:right;">₱${i.total.toLocaleString()}</td>
+      </tr>
+    `).join('');
+    w.document.write(`
+      <html>
+      <head><title>Transaction #${tx.id}</title></head>
+      <body style="font-family:system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; color:#111827;">
+        <h2>Transaction #${tx.id}</h2>
+        <p>Date: ${tx.date || ''} ${tx.time || ''}</p>
+        <p>Customer: ${tx.customer || 'N/A'}</p>
+        <table style="border-collapse:collapse;width:100%;margin-top:12px;">
+          <thead>
+            <tr>
+              <th style="padding:6px;border:1px solid #e5e7eb;text-align:left;">Item</th>
+              <th style="padding:6px;border:1px solid #e5e7eb;text-align:right;">Qty</th>
+              <th style="padding:6px;border:1px solid #e5e7eb;text-align:right;">Price</th>
+              <th style="padding:6px;border:1px solid #e5e7eb;text-align:right;">Total</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+          <tfoot>
+            <tr>
+              <td colspan="3" style="padding:6px;border:1px solid #e5e7eb;text-align:right;font-weight:600;">Grand Total</td>
+              <td style="padding:6px;border:1px solid #e5e7eb;text-align:right;font-weight:600;">₱${Number(data.grandTotal||0).toLocaleString()}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </body>
+      </html>
+    `);
+    w.document.close();
+    w.focus();
+    w.print();
+    w.close();
+  };
+
   const [paymentMethodOptions, setPaymentMethodOptions] = useState([
     { value: 'all', label: 'All Payment Methods' }
   ]);
@@ -286,6 +383,7 @@ const TransactionTable = ({ transactions }) => {
                       size="xs"
                       iconName="Eye"
                       iconSize={14}
+                      onClick={() => handleView(transaction)}
                     >
                       View
                     </Button>
@@ -294,6 +392,7 @@ const TransactionTable = ({ transactions }) => {
                       size="xs"
                       iconName="Printer"
                       iconSize={14}
+                      onClick={() => handlePrint(transaction)}
                     >
                       Print
                     </Button>
@@ -304,6 +403,76 @@ const TransactionTable = ({ transactions }) => {
           </tbody>
         </table>
       </div>
+
+      {/* Details Modal */}
+      {showModal && (
+        <>
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-1100" onClick={() => setShowModal(false)}></div>
+          <div className="fixed inset-0 z-1200 flex items-center justify-center p-4">
+            <div className="w-full max-w-2xl bg-card border border-border rounded-lg shadow-raised">
+              <div className="flex items-center justify-between p-4 border-b border-border">
+                <h3 className="font-heading text-lg font-semibold text-foreground">Transaction Details</h3>
+                <Button variant="ghost" size="icon" onClick={() => setShowModal(false)} iconName="X" iconSize={18} />
+              </div>
+              <div className="p-4">
+                {modalLoading && (
+                  <p className="text-sm text-muted-foreground">Loading...</p>
+                )}
+                {modalError && (
+                  <p className="text-sm text-destructive">{modalError}</p>
+                )}
+                {(!modalLoading && !modalError && modalData) && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Transaction ID:</span>
+                        <p className="font-medium">{modalData?.sale?.sale_id}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Date:</span>
+                        <p className="font-medium">{modalData?.sale?.sale_date ? new Date(modalData.sale.sale_date).toLocaleString() : ''}</p>
+                      </div>
+                    </div>
+                    <div className="border rounded-md overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead className="bg-muted">
+                          <tr>
+                            <th className="text-left p-2">Item</th>
+                            <th className="text-right p-2">Qty</th>
+                            <th className="text-right p-2">Price</th>
+                            <th className="text-right p-2">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(modalData.items||[]).map((it, idx) => (
+                            <tr key={idx} className="border-t border-border">
+                              <td className="p-2">{it.name}</td>
+                              <td className="p-2 text-right">{it.qty}</td>
+                              <td className="p-2 text-right">₱{Number(it.price||0).toLocaleString()}</td>
+                              <td className="p-2 text-right">₱{Number(it.total||0).toLocaleString()}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr className="border-t border-border">
+                            <td className="p-2 text-right font-semibold" colSpan={3}>Grand Total</td>
+                            <td className="p-2 text-right font-semibold">₱{Number(modalData.grandTotal||0).toLocaleString()}</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="p-4 border-t border-border flex items-center justify-end space-x-2">
+                <Button variant="outline" onClick={() => setShowModal(false)}>Close</Button>
+                <Button variant="default" iconName="Printer" iconSize={16} onClick={() => modalData && handlePrint({ id: modalData?.sale?.sale_id, date: '', time: '', customer: '' })}>Print</Button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="p-4 border-t border-border">

@@ -510,17 +510,7 @@ const InventoryManagement = () => {
     setShowProductModal(true);
   };
 
-  const handleDuplicateProduct = (product) => {
-    const duplicatedProduct = {
-      ...product,
-      id: Date.now(),
-      name: `${product?.name} (Copy)`,
-      sku: `${product?.sku}-COPY`,
-      stock: 0
-    };
-    setEditingProduct(duplicatedProduct);
-    setShowProductModal(true);
-  };
+  
 
   const handleDeleteProduct = async (product) => {
     const confirmed = window.confirm(`Are you sure you want to delete "${product?.name}"?`);
@@ -728,7 +718,6 @@ const InventoryManagement = () => {
                         isSelected={selectedItems?.includes(product?.id)}
                         onSelect={handleSelectItem}
                         onEdit={handleEditProduct}
-                        onDuplicate={handleDuplicateProduct}
                         onDelete={handleDeleteProduct}
                       />
                     ))}
@@ -740,7 +729,6 @@ const InventoryManagement = () => {
                     onSelectItem={handleSelectItem}
                     onSelectAll={handleSelectAll}
                     onEdit={handleEditProduct}
-                    onDuplicate={handleDuplicateProduct}
                     onDelete={handleDeleteProduct}
                     sortConfig={sortConfig}
                     onSort={handleSort}

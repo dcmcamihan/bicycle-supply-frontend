@@ -197,14 +197,6 @@ const InventoryTable = ({
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => onDuplicate(product)}
-                      iconName="Copy"
-                      iconSize={16}
-                      className="h-8 w-8"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
                       onClick={() => onDelete(product)}
                       iconName="Trash2"
                       iconSize={16}

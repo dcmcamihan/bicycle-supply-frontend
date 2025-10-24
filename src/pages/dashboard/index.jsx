@@ -10,10 +10,15 @@ import RecentTransactions from './components/RecentTransactions';
 import LowStockAlert from './components/LowStockAlert';
 import ActivityFeed from './components/ActivityFeed';
 import Icon from '../../components/AppIcon';
+import API_ENDPOINTS from '../../config/api';
 
 const Dashboard = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [todaySales, setTodaySales] = useState(0);
+  const [totalInventory, setTotalInventory] = useState(0);
+  const [lowStockCount, setLowStockCount] = useState(0);
+  const [pendingOrders, setPendingOrders] = useState(0);
 
   // Update current time every minute
   useEffect(() => {
@@ -28,36 +33,102 @@ const Dashboard = () => {
     setSidebarCollapsed(!sidebarCollapsed);
   };
 
+  useEffect(() => {
+    const loadMetrics = async () => {
+      try {
+        const prodsRes = await fetch(API_ENDPOINTS.PRODUCTS);
+        const prods = prodsRes.ok ? await prodsRes.json() : [];
+        const qohPromises = prods.map(async (p) => {
+          try {
+            const r = await fetch(`${API_ENDPOINTS.PRODUCT(p.product_id || p.id)}/quantity-on-hand`);
+            if (r.ok) {
+              const n = await r.json();
+              return { id: p.product_id || p.id, qoh: Number(n) || 0, reorder: Number(p.reorder_level || 0) };
+            }
+          } catch {}
+          return { id: p.product_id || p.id, qoh: 0, reorder: Number(p.reorder_level || 0) };
+        });
+        const qohList = await Promise.all(qohPromises);
+        const totalInv = qohList.reduce((s, x) => s + (x.qoh || 0), 0);
+        const lowCount = qohList.reduce((s, x) => s + ((x.qoh || 0) <= (x.reorder || 0) ? 1 : 0), 0);
+        setTotalInventory(totalInv);
+        setLowStockCount(lowCount);
+
+        const priceMap = new Map(prods.map(p => [Number(p.product_id || p.id), Number(p.price || 0)]));
+        const salesRes = await fetch(API_ENDPOINTS.SALES);
+        const sales = salesRes.ok ? await salesRes.json() : [];
+        const today = new Date();
+        const startToday = new Date(today); startToday.setHours(0,0,0,0);
+        const endToday = new Date(today); endToday.setHours(23,59,59,999);
+
+        let todayTotal = 0;
+        let pending = 0;
+        for (const s of sales) {
+          const saleId = s.sale_id || s.id;
+          const d = new Date(s.sale_date || s.date || s.created_at);
+          try {
+            const payRes = await fetch(API_ENDPOINTS.SALE_PAYMENT_TYPES_BY_SALE(saleId));
+            if (!payRes.ok) {
+              pending += 1;
+            } else {
+              const pays = await payRes.json();
+              if (!Array.isArray(pays) || pays.length === 0) pending += 1;
+            }
+          } catch {
+            pending += 1;
+          }
+
+          if (!isNaN(d) && d >= startToday && d <= endToday) {
+            let sum = 0;
+            try {
+              const detRes = await fetch(API_ENDPOINTS.SALE_DETAILS(saleId));
+              if (detRes.ok) {
+                const dets = await detRes.json();
+                sum = dets.reduce((acc, det) => {
+                  const pid = Number(det.product_id);
+                  const qty = Number(det.quantity_sold || det.quantity || 0);
+                  const price = priceMap.get(pid) || 0;
+                  return acc + (price * qty);
+                }, 0);
+              }
+            } catch {}
+            todayTotal += sum;
+          }
+        }
+        setTodaySales(todayTotal);
+        setPendingOrders(pending);
+      } catch {
+        setTodaySales(0);
+        setTotalInventory(0);
+        setLowStockCount(0);
+        setPendingOrders(0);
+      }
+    };
+    loadMetrics();
+  }, []);
+
   const metricsData = [
     {
       title: "Today\'s Sales",
-      value: "₱12,847",
-      change: "+12.5%",
-      changeType: "positive",
+      value: new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(todaySales || 0),
       icon: "DollarSign",
       color: "primary"
     },
     {
       title: "Total Inventory",
-      value: "1,247",
-      change: "-3.2%",
-      changeType: "negative",
+      value: String(totalInventory || 0),
       icon: "Package",
       color: "success"
     },
     {
       title: "Low Stock Items",
-      value: "23",
-      change: "+5",
-      changeType: "negative",
+      value: String(lowStockCount || 0),
       icon: "AlertTriangle",
       color: "warning"
     },
     {
       title: "Pending Orders",
-      value: "8",
-      change: "0",
-      changeType: "neutral",
+      value: String(pendingOrders || 0),
       icon: "Clock",
       color: "accent"
     }

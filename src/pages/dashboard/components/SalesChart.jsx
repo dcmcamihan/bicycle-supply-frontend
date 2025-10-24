@@ -6,16 +6,20 @@ import API_ENDPOINTS from '../../../config/api';
 
 const SalesChart = () => {
   const [chartType, setChartType] = useState('bar');
-  const [timeRange, setTimeRange] = useState('week'); // 'day' | '24h' | 'week' | 'month'
+  const [timeRange, setTimeRange] = useState('week'); // 'day' | 'week' | 'month'
   const [sales, setSales] = useState([]); // raw sales
   const [loading, setLoading] = useState(false);
 
-  // Color palette for bars
+  // Theme palette for bars (uses project CSS variables)
   const BAR_COLORS = useMemo(() => [
-    '#2563eb', '#16a34a', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16'
+    'var(--color-primary)',
+    'var(--color-accent)',
+    'var(--color-success)',
+    'var(--color-warning)',
+    'var(--color-destructive)'
   ], []);
 
-  // Fetch sales and, if total_amount is missing, compute from sale details
+  // Fetch sales and, if total_amount is missing, compute from sale details using product prices
   useEffect(() => {
     const loadSales = async () => {
       setLoading(true);
@@ -23,6 +27,18 @@ const SalesChart = () => {
         const res = await fetch(API_ENDPOINTS.SALES);
         if (!res.ok) throw new Error('Failed to fetch sales');
         const salesList = await res.json();
+
+        // Build product price map to compute totals when unit_price is not returned in sale details
+        let priceMap = new Map();
+        try {
+          const prodRes = await fetch(API_ENDPOINTS.PRODUCTS);
+          if (prodRes.ok) {
+            const prods = await prodRes.json();
+            for (const p of prods) {
+              priceMap.set(Number(p.product_id || p.id), Number(p.price || 0));
+            }
+          }
+        } catch {}
 
         // Normalize: ensure sale_date and total_amount
         const enriched = [];
@@ -35,7 +51,12 @@ const SalesChart = () => {
               const dRes = await fetch(API_ENDPOINTS.SALE_DETAILS(saleId));
               if (dRes.ok) {
                 const dets = await dRes.json();
-                total = dets.reduce((sum, d) => sum + (Number(d.unit_price || 0) * Number(d.quantity_sold || d.quantity || 0)), 0);
+                total = dets.reduce((sum, d) => {
+                  const pid = Number(d.product_id);
+                  const qty = Number(d.quantity_sold ?? d.quantity ?? 0);
+                  const price = priceMap.get(pid) || 0;
+                  return sum + (price * qty);
+                }, 0);
               }
             } catch {}
           }
@@ -51,8 +72,8 @@ const SalesChart = () => {
     loadSales();
   }, []);
 
-  // Build day (hourly), rolling 24h (hourly), weekly and monthly aggregates from sales
-  const { dayData, rolling24Data, weeklyData, monthlyData } = useMemo(() => {
+  // Build day (hourly), weekly and monthly aggregates from sales
+  const { dayData, weeklyData, monthlyData } = useMemo(() => {
     // Helpers
     const formatDay = (d) => ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
     const startOfWeek = (d) => { const x = new Date(d); const day = x.getDay(); const diff = x.getDate() - day; return new Date(x.setDate(diff)); };
@@ -79,24 +100,6 @@ const SalesChart = () => {
       }
     }
     const dayData = hourTotalsToday.map((amt, h) => ({ name: hourLabel(h), sales: amt, orders: hourOrdersToday[h] }));
-
-    // Rolling last 24 hours by hour bucket
-    const start24 = new Date(now.getTime() - (24 * 60 * 60 * 1000));
-    const buckets = [];
-    for (let i = 23; i >= 0; i--) {
-      const slotStart = new Date(now.getTime() - (i * 60 * 60 * 1000)); slotStart.setMinutes(0,0,0);
-      const slotEnd = new Date(slotStart.getTime() + 60 * 60 * 1000 - 1);
-      buckets.push({ start: slotStart, end: slotEnd });
-    }
-    const rolling24Data = buckets.map(b => {
-      let amt = 0, cnt = 0;
-      for (const s of sales) {
-        const d = new Date(s.sale_date);
-        if (isNaN(d)) continue;
-        if (d >= b.start && d <= b.end) { amt += Number(s.total_amount || 0); cnt += 1; }
-      }
-      return { name: `${b.start.getHours().toString().padStart(2,'0')}:00`, sales: amt, orders: cnt };
-    });
 
     // Last 7 days by day label
     const dayTotals = new Map();
@@ -145,12 +148,11 @@ const SalesChart = () => {
     }
     const monthly = sortedWeeks.map((wk, idx) => ({ name: `Week ${idx+1}`, sales: weekTotals.get(wk) || 0, orders: weekOrders.get(wk) || 0 }));
 
-    return { dayData, rolling24Data, weeklyData: weekly, monthlyData: monthly };
+    return { dayData, weeklyData: weekly, monthlyData: monthly };
   }, [sales]);
 
   const currentData = (
     timeRange === 'day' ? dayData :
-    timeRange === '24h' ? rolling24Data :
     timeRange === 'week' ? weeklyData : monthlyData
   );
   const hasAnyData = Array.isArray(currentData) && currentData.some(d => (Number(d.sales) || 0) > 0);
@@ -195,14 +197,6 @@ const SalesChart = () => {
               className="px-3 py-1"
             >
               Day
-            </Button>
-            <Button
-              variant={timeRange === '24h' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setTimeRange('24h')}
-              className="px-3 py-1"
-            >
-              24h
             </Button>
             <Button
               variant={timeRange === 'week' ? 'default' : 'ghost'}

@@ -199,16 +199,7 @@ const ProductDetails = () => {
     }
   };
 
-  const handleDuplicateProduct = (productToDuplicate) => {
-    const duplicatedProduct = {
-      ...productToDuplicate,
-      id: `${productToDuplicate?.id}-COPY`,
-      sku: `${productToDuplicate?.sku}-COPY`,
-      name: `${productToDuplicate?.name} (Copy)`
-    };
-    console.log('Product duplicated:', duplicatedProduct);
-    // In real app, this would navigate to the new product or show success message
-  };
+  
 
   const handleDeleteProduct = (productId) => {
     console.log('Product deleted:', productId);
@@ -262,7 +253,6 @@ const ProductDetails = () => {
             product={product}
             isEditing={isEditing}
             onToggleEdit={handleToggleEdit}
-            onDuplicate={handleDuplicateProduct}
             onDelete={handleDeleteProduct}
           />
 
@@ -294,7 +284,6 @@ const ProductDetails = () => {
                 <ProductActions
                   product={product}
                   onEdit={handleEditProduct}
-                  onDuplicate={handleDuplicateProduct}
                   onDelete={handleDeleteProduct}
                   onAddToCart={handleAddToCart}
                   onAdjustStock={openAdjustStock}
@@ -342,7 +331,6 @@ const ProductDetails = () => {
                     <ProductActions
                       product={product}
                       onEdit={handleEditProduct}
-                      onDuplicate={handleDuplicateProduct}
                       onDelete={handleDeleteProduct}
                       onAddToCart={handleAddToCart}
                     />
