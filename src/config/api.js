@@ -6,6 +6,11 @@ export const API_ENDPOINTS = {
   PRODUCTS: `${API_BASE_URL}/products`, // GET all, POST new
   PRODUCT: (productId) => `${API_BASE_URL}/products/${productId}`,
 
+  // Product Images
+  PRODUCT_IMAGES: `${API_BASE_URL}/product-images`, // GET all, POST new
+  PRODUCT_IMAGE: (imageId) => `${API_BASE_URL}/product-images/${imageId}`,
+  PRODUCT_IMAGES_BY_PRODUCT: (productId) => `${API_BASE_URL}/product-images/product/${productId}`,
+
   // Sales
   SALES: `${API_BASE_URL}/sales`,
   SALE_DETAILS: (saleId) => `${API_BASE_URL}/sale-details/sale/${saleId}`,
