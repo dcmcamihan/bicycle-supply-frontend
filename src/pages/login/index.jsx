@@ -5,17 +5,16 @@ import LoginHeader from './components/LoginHeader';
 import LoginForm from './components/LoginForm';
 import SecurityBadges from './components/SecurityBadges';
 import LoginBackground from './components/LoginBackground';
+import { useAuth } from '../../contexts/AuthContext';
 
 const LoginPage = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
-  // Check if user is already authenticated
+  // If already authenticated, redirect
   useEffect(() => {
-    const isAuthenticated = localStorage.getItem('isAuthenticated');
-    if (isAuthenticated === 'true') {
-      navigate('/dashboard', { replace: true });
-    }
-  }, [navigate]);
+    if (user) navigate('/dashboard', { replace: true });
+  }, [navigate, user]);
 
   return (
     <>

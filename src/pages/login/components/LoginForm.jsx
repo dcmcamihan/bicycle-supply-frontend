@@ -4,22 +4,14 @@ import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import { Checkbox } from '../../../components/ui/Checkbox';
 import Icon from '../../../components/AppIcon';
+import { useAuth } from '../../../contexts/AuthContext';
 
 const LoginForm = () => {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    rememberMe: false
-  });
+  const { login } = useAuth();
+  const [formData, setFormData] = useState({ username: '', password: '', rememberMe: false });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-
-  // Mock credentials for authentication
-  const mockCredentials = {
-    email: 'admin@bikeshoppro.com',
-    password: 'BikeShop2025!'
-  };
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e?.target;
@@ -40,11 +32,7 @@ const LoginForm = () => {
   const validateForm = () => {
     const newErrors = {};
     
-    if (!formData?.email) {
-      newErrors.email = 'Email address is required';
-    } else if (!/\S+@\S+\.\S+/?.test(formData?.email)) {
-      newErrors.email = 'Please enter a valid email address';
-    }
+    if (!formData?.username) newErrors.username = 'Username is required';
     
     if (!formData?.password) {
       newErrors.password = 'Password is required';
@@ -64,32 +52,19 @@ const LoginForm = () => {
     }
     
     setIsLoading(true);
-    
-    // Simulate API call delay
-    setTimeout(() => {
-      if (
-        formData?.email === mockCredentials?.email && 
-        formData?.password === mockCredentials?.password
-      ) {
-        // Successful login
-        localStorage.setItem('isAuthenticated', 'true');
-        localStorage.setItem('userEmail', formData?.email);
-        if (formData?.rememberMe) {
-          localStorage.setItem('rememberMe', 'true');
-        }
-        navigate('/dashboard');
-      } else {
-        // Failed login
-        setErrors({
-          general: 'Invalid email or password. Please try again.'
-        });
-      }
+    try {
+      await login(formData.username, formData.password);
+      if (formData.rememberMe) localStorage.setItem('rememberMe', 'true');
+      navigate('/dashboard');
+    } catch (e) {
+      setErrors({ general: e?.message || 'Login failed' });
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   const handleForgotPassword = () => {
-    alert('Password reset functionality would be implemented here. For demo, use: admin@bikeshoppro.com / BikeShop2025!');
+    navigate('/forgot-password');
   };
 
   return (
@@ -108,15 +83,15 @@ const LoginForm = () => {
           </div>
         )}
 
-        {/* Email Field */}
+        {/* Username Field */}
         <Input
-          label="Email Address"
-          type="email"
-          name="email"
-          placeholder="Enter your email address"
-          value={formData?.email}
+          label="Username"
+          type="text"
+          name="username"
+          placeholder="Enter your username"
+          value={formData?.username}
           onChange={handleInputChange}
-          error={errors?.email}
+          error={errors?.username}
           required
           disabled={isLoading}
           className="w-full"
@@ -172,19 +147,7 @@ const LoginForm = () => {
           {isLoading ? 'Signing In...' : 'Sign In'}
         </Button>
 
-        {/* Demo Credentials Info */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
-          <div className="flex items-start space-x-3">
-            <Icon name="Info" size={20} className="text-blue-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-blue-800 font-body text-sm font-medium mb-1">Demo Access</p>
-              <p className="text-blue-700 font-caption text-xs">
-                Email: admin@bikeshoppro.com<br />
-                Password: BikeShop2025!
-              </p>
-            </div>
-          </div>
-        </div>
+        
       </form>
     </div>
   );

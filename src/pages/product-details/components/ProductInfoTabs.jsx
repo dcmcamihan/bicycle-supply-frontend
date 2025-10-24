@@ -12,6 +12,7 @@ const ProductInfoTabs = ({ product, isEditing, onToggleEdit, onSave, refreshToke
   const [currentStock, setCurrentStock] = useState(0);
   const [movements, setMovements] = useState([]);
   const [loadingMovements, setLoadingMovements] = useState(false);
+  
 
   // Sync editedProduct with product only when product changes, not on every render or edit toggle
   React.useEffect(() => {
@@ -294,6 +295,8 @@ const ProductInfoTabs = ({ product, isEditing, onToggleEdit, onSave, refreshToke
         />
         <div />
       </div>
+
+      
 
       <div className="bg-card border border-border rounded-lg p-4">
         <h4 className="font-body font-semibold text-sm text-foreground mb-3 flex items-center space-x-2">

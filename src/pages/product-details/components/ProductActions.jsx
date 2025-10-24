@@ -1,10 +1,21 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 
-const ProductActions = ({ product, onEdit, onDelete, onAddToCart, onAdjustStock }) => {
+const ProductActions = ({ product, onEdit, onDelete, onAddToCart, onAdjustStock, stats }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  const formatted = useMemo(() => {
+    const revenue = Number(stats?.revenue || 0);
+    const lastSold = stats?.lastSold ? new Date(stats.lastSold) : null;
+    return {
+      totalSold: Number(stats?.totalSold || 0),
+      revenue: `₱${revenue.toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
+      lastSold: lastSold ? lastSold.toLocaleDateString() : '-',
+      daysInStock: stats?.daysInStock ?? '-',
+    };
+  }, [stats]);
 
   const handleDelete = async () => {
     setIsProcessing(true);
@@ -164,22 +175,22 @@ const ProductActions = ({ product, onEdit, onDelete, onAddToCart, onAdjustStock 
         <div className="space-y-3">
           <div className="flex justify-between items-center">
             <span className="text-sm font-caption text-muted-foreground">Total Sales:</span>
-            <span className="text-sm font-body text-foreground font-semibold">47 units</span>
+            <span className="text-sm font-body text-foreground font-semibold">{formatted.totalSold} units</span>
           </div>
           
           <div className="flex justify-between items-center">
             <span className="text-sm font-caption text-muted-foreground">Revenue Generated:</span>
-            <span className="text-sm font-body text-success font-semibold">₱23,500</span>
+            <span className="text-sm font-body text-success font-semibold">{formatted.revenue}</span>
           </div>
           
           <div className="flex justify-between items-center">
             <span className="text-sm font-caption text-muted-foreground">Last Sold:</span>
-            <span className="text-sm font-body text-foreground">2 days ago</span>
+            <span className="text-sm font-body text-foreground">{formatted.lastSold}</span>
           </div>
           
           <div className="flex justify-between items-center">
             <span className="text-sm font-caption text-muted-foreground">Days in Stock:</span>
-            <span className="text-sm font-body text-foreground">127 days</span>
+            <span className="text-sm font-body text-foreground">{formatted.daysInStock} days</span>
           </div>
         </div>
       </div>

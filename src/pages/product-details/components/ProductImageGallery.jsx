@@ -106,29 +106,6 @@ const ProductImageGallery = ({ product }) => {
           </button>
         ))}
       </div>
-      {/* Image Actions */}
-      <div className="flex space-x-2">
-        <Button
-          variant="outline"
-          size="sm"
-          iconName="Download"
-          iconPosition="left"
-          iconSize={16}
-          className="flex-1"
-        >
-          Download
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          iconName="Share"
-          iconPosition="left"
-          iconSize={16}
-          className="flex-1"
-        >
-          Share
-        </Button>
-      </div>
     </div>
   );
 };

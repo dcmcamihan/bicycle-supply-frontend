@@ -11,6 +11,7 @@ import LowStockAlert from './components/LowStockAlert';
 import ActivityFeed from './components/ActivityFeed';
 import Icon from '../../components/AppIcon';
 import API_ENDPOINTS from '../../config/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 const Dashboard = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -19,6 +20,7 @@ const Dashboard = () => {
   const [totalInventory, setTotalInventory] = useState(0);
   const [lowStockCount, setLowStockCount] = useState(0);
   const [pendingOrders, setPendingOrders] = useState(0);
+  const { user } = useAuth();
 
   // Update current time every minute
   useEffect(() => {
@@ -134,11 +136,7 @@ const Dashboard = () => {
     }
   ];
 
-  const user = {
-    name: 'John Doe',
-    role: 'Store Manager',
-    email: 'john@bikeshoppro.com'
-  };
+  const displayName = user?.first_name ? user.first_name : 'User';
 
   return (
     <>
@@ -161,7 +159,7 @@ const Dashboard = () => {
                     Dashboard
                   </h1>
                   <p className="font-body text-muted-foreground">
-                    Welcome back, {user?.name}. Here's what's happening at your bike shop today.
+                    Welcome back, {displayName}. Here's what's happening at your bike shop today.
                   </p>
                 </div>
                 <div className="hidden md:flex items-center space-x-4 text-sm text-muted-foreground">

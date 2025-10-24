@@ -21,6 +21,7 @@ const ProductDetails = () => {
   const [showAdjust, setShowAdjust] = useState(false);
   const [currentQoh, setCurrentQoh] = useState(0);
   const [refreshCounter, setRefreshCounter] = useState(0);
+  const [stats, setStats] = useState({ totalSold: 0, revenue: 0, lastSold: null, daysInStock: null });
 
   // Get id from URL query params
   const searchParams = new URLSearchParams(location.search);
@@ -134,6 +135,72 @@ const ProductDetails = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productId]);
+
+  // Compute product statistics (outside of tabs)
+  useEffect(() => {
+    const loadStats = async () => {
+      const pid = Number(product?.id || productId);
+      if (!pid) return;
+      try {
+        let totalSold = 0;
+        let lastSold = null;
+        let firstSupplyDate = null;
+        // Sales
+        try {
+          const salesRes = await fetch(API_ENDPOINTS.SALES);
+          if (salesRes.ok) {
+            const sales = await salesRes.json();
+            for (const sale of sales) {
+              try {
+                const detRes = await fetch(API_ENDPOINTS.SALE_DETAILS(sale.sale_id));
+                if (!detRes.ok) continue;
+                const details = await detRes.json();
+                for (const d of details) {
+                  if (Number(d.product_id) === pid) {
+                    totalSold += Number(d.quantity_sold) || 0;
+                    const saleDate = sale.sale_date ? new Date(sale.sale_date) : null;
+                    if (saleDate && (!lastSold || saleDate > lastSold)) lastSold = saleDate;
+                  }
+                }
+              } catch {}
+            }
+          }
+        } catch {}
+
+        // Supplies
+        try {
+          const supRes = await fetch(API_ENDPOINTS.SUPPLIES);
+          if (supRes.ok) {
+            const supplies = await supRes.json();
+            for (const sup of supplies) {
+              try {
+                const sdetRes = await fetch(API_ENDPOINTS.SUPPLY_DETAILS_BY_SUPPLY(sup.supply_id));
+                if (!sdetRes.ok) continue;
+                const sdetails = await sdetRes.json();
+                for (const sd of sdetails) {
+                  if (Number(sd.product_id) === pid) {
+                    const supDate = sup.supply_date ? new Date(sup.supply_date) : null;
+                    if (supDate && (!firstSupplyDate || supDate < firstSupplyDate)) firstSupplyDate = supDate;
+                  }
+                }
+              } catch {}
+            }
+          }
+        } catch {}
+
+        const revenue = (Number(product?.price) || 0) * totalSold;
+        let daysInStock = null;
+        if (firstSupplyDate) {
+          const ms = Date.now() - firstSupplyDate.getTime();
+          daysInStock = Math.max(0, Math.floor(ms / (1000 * 60 * 60 * 24)));
+        }
+        setStats({ totalSold, revenue, lastSold, daysInStock });
+      } catch {
+        setStats({ totalSold: 0, revenue: 0, lastSold: null, daysInStock: null });
+      }
+    };
+    loadStats();
+  }, [product?.id, product?.price, productId]);
 
   const handleSidebarToggle = () => {
     setIsSidebarCollapsed(!isSidebarCollapsed);
@@ -287,6 +354,7 @@ const ProductDetails = () => {
                   onDelete={handleDeleteProduct}
                   onAddToCart={handleAddToCart}
                   onAdjustStock={openAdjustStock}
+                  stats={stats}
                 />
               </div>
             </div>

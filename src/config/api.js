@@ -23,6 +23,26 @@ export const API_ENDPOINTS = {
   // Employees
   EMPLOYEES: `${API_BASE_URL}/employees`,
   EMPLOYEE: (employeeId) => `${API_BASE_URL}/employees/${employeeId}`,
+  EMPLOYEE_LOGIN: `${API_BASE_URL}/employees/login`,
+  EMPLOYEE_REHASH_PASSWORDS: `${API_BASE_URL}/employees/rehash-passwords`,
+
+  // Auth (password resets)
+  AUTH_REQUEST_RESET: `${API_BASE_URL}/auth/request-reset`,
+  AUTH_RESET: `${API_BASE_URL}/auth/reset`,
+
+  // Roles
+  EMPLOYEE_ROLES_BY_EMPLOYEE: (employeeId) => `${API_BASE_URL}/employee-roles/employee/${employeeId}`,
+  ROLE_TYPE: (code) => `${API_BASE_URL}/role-types/${code}`,
+
+  // Employee Contacts
+  EMPLOYEE_CONTACTS: `${API_BASE_URL}/employee-contacts`,
+
+  // Employee Attendance and details
+  EMPLOYEE_ATTENDANCES: `${API_BASE_URL}/employee-attendances`,
+  ATTENDANCE_DETAILS: `${API_BASE_URL}/attendance-details`,
+
+  // Employee Role History
+  EMPLOYEE_ROLE_HISTORIES: `${API_BASE_URL}/employee-role-histories`,
 
   // Payment Methods
   PAYMENT_METHODS: `${API_BASE_URL}/payment-methods`, // GET all

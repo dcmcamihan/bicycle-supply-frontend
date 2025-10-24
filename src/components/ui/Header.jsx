@@ -1,22 +1,61 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Icon from '../AppIcon';
 import Button from './Button';
+import { useAuth } from '../../contexts/AuthContext';
+import API_ENDPOINTS from '../../config/api';
 
 const Header = ({ onSidebarToggle, user = null }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
   const location = useLocation();
   const navigate = useNavigate();
+  const { logout, user: ctxUser } = useAuth();
+  const activeUser = user || ctxUser;
 
   const handleUserMenuToggle = () => {
     setIsUserMenuOpen(!isUserMenuOpen);
   };
 
+  // Load basic notifications from recent sales and stockouts
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        const [salesRes, stockoutRes] = await Promise.all([
+          fetch(API_ENDPOINTS.SALES),
+          fetch(API_ENDPOINTS.STOCKOUTS)
+        ]);
+        const sales = salesRes.ok ? await salesRes.json() : [];
+        const stockouts = stockoutRes.ok ? await stockoutRes.json() : [];
+        const saleItems = (sales||[]).slice(-5).map(s => ({
+          id: `sale-${s.sale_id}`,
+          icon: 'Receipt',
+          title: `Sale #${s.sale_id}`,
+          subtitle: new Date(s.sale_date).toLocaleString(),
+        }));
+        const stockoutItems = (stockouts||[]).slice(-5).map(st => ({
+          id: `stockout-${st.stockout_id}`,
+          icon: 'PackageMinus',
+          title: `Stockout #${st.stockout_id}`,
+          subtitle: new Date(st.stockout_date).toLocaleString(),
+        }));
+        if (mounted) setNotifications([...stockoutItems, ...saleItems].slice(-8).reverse());
+      } catch {
+        // ignore
+      }
+    };
+    load();
+    const t = setInterval(load, 60000);
+    return () => { mounted = false; clearInterval(t); };
+  }, []);
+
   const handleLogout = () => {
-    // Logout logic would be implemented here
-    console.log('Logout clicked');
+    logout();
     setIsUserMenuOpen(false);
+    navigate('/login');
   };
 
   const handleSearchSubmit = (e) => {
@@ -88,16 +127,45 @@ const Header = ({ onSidebarToggle, user = null }) => {
           </Button>
 
           {/* Notifications */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="relative"
-            iconName="Bell"
-            iconSize={20}
-          >
-            <span className="absolute -top-1 -right-1 w-3 h-3 bg-accent rounded-full"></span>
-            <span className="sr-only">Notifications</span>
-          </Button>
+          <div className="relative">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="relative"
+              iconName="Bell"
+              iconSize={20}
+              onClick={() => setIsNotificationsOpen(v => !v)}
+            >
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-accent rounded-full"></span>
+              <span className="sr-only">Notifications</span>
+            </Button>
+            {isNotificationsOpen && (
+              <>
+                <div className="fixed inset-0 z-1100" onClick={() => setIsNotificationsOpen(false)}></div>
+                <div className="absolute right-0 top-full mt-2 w-80 bg-popover border border-border rounded-lg shadow-raised z-1200 backdrop-glass">
+                  <div className="p-3 border-b border-border flex items-center justify-between">
+                    <p className="font-body text-sm font-semibold">Notifications</p>
+                    <span className="font-caption text-xs text-muted-foreground">{notifications.length}</span>
+                  </div>
+                  <div className="max-h-80 overflow-auto divide-y divide-border">
+                    {notifications.length === 0 ? (
+                      <div className="p-4 text-sm text-muted-foreground">No recent activity</div>
+                    ) : notifications.map(n => (
+                      <div key={n.id} className="p-3 flex items-start space-x-3 hover:bg-muted/50">
+                        <div className="w-8 h-8 rounded-md bg-secondary flex items-center justify-center flex-shrink-0">
+                          <Icon name={n.icon} size={16} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-body text-sm text-popover-foreground truncate">{n.title}</p>
+                          <p className="font-caption text-xs text-muted-foreground truncate">{n.subtitle}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
 
           {/* User Menu */}
           <div className="relative">
@@ -110,7 +178,7 @@ const Header = ({ onSidebarToggle, user = null }) => {
                 <Icon name="User" size={16} color="white" />
               </div>
               <span className="hidden sm:block font-body text-sm text-foreground">
-                {user?.name || 'John Doe'}
+                {(activeUser?.first_name || '') + (activeUser?.last_name ? ` ${activeUser.last_name}` : '') || 'Guest'}
               </span>
               <Icon 
                 name="ChevronDown" 
@@ -129,14 +197,12 @@ const Header = ({ onSidebarToggle, user = null }) => {
                 <div className="absolute right-0 top-full mt-2 w-56 bg-popover border border-border rounded-lg shadow-raised z-1200 backdrop-glass">
                   <div className="p-3 border-b border-border">
                     <p className="font-body font-semibold text-sm text-popover-foreground">
-                      {user?.name || 'John Doe'}
+                      {(activeUser?.first_name || '') + (activeUser?.last_name ? ` ${activeUser.last_name}` : '') || 'Guest'}
                     </p>
                     <p className="font-caption text-xs text-muted-foreground">
-                      {user?.role || 'Store Manager'}
+                      {activeUser?.role || 'Employee'}
                     </p>
-                    <p className="font-caption text-xs text-muted-foreground">
-                      {user?.email || 'john@bikeshoppro.com'}
-                    </p>
+                    
                   </div>
                   
                   <div className="py-2">
