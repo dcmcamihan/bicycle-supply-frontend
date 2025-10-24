@@ -3,9 +3,10 @@ import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, R
 
 import Button from '../../../components/ui/Button';
 
-const SalesChart = ({ data, title = "Sales Trends" }) => {
+const SalesChart = ({ data, title = "Sales Trends", timeframe: timeframeProp, onTimeframeChange }) => {
   const [chartType, setChartType] = useState('line');
-  const [timeframe, setTimeframe] = useState('daily');
+  const [localTimeframe, setLocalTimeframe] = useState('daily');
+  const timeframe = timeframeProp ?? localTimeframe;
 
   const chartData = data || [
     { name: 'Mon', sales: 12500, transactions: 45, avgOrder: 278 },
@@ -89,7 +90,11 @@ const SalesChart = ({ data, title = "Sales Trends" }) => {
           
           <select 
             value={timeframe}
-            onChange={(e) => setTimeframe(e?.target?.value)}
+            onChange={(e) => {
+              const v = e?.target?.value;
+              if (onTimeframeChange) onTimeframeChange(v);
+              else setLocalTimeframe(v);
+            }}
             className="px-3 py-1 bg-input border border-border rounded-lg font-body text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           >
             <option value="hourly">Hourly</option>

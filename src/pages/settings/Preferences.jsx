@@ -31,9 +31,11 @@ const applyTheme = (theme) => {
 const Preferences = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
-  const [prefs, setPrefs] = useState({
-    compactMode: false,
-    reduceMotion: false,
+  const [prefs, setPrefs] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('prefs') || '{}');
+      return { compactMode: !!saved.compactMode, reduceMotion: !!saved.reduceMotion };
+    } catch { return { compactMode: false, reduceMotion: false }; }
   });
 
   useEffect(() => {
@@ -41,9 +43,19 @@ const Preferences = () => {
     localStorage.setItem('theme', theme);
   }, [theme]);
 
+  // Apply and persist general prefs
+  useEffect(() => {
+    localStorage.setItem('prefs', JSON.stringify(prefs));
+    const root = document.documentElement;
+    // Compact mode toggles a CSS class consumers can use
+    root.classList.toggle('compact', !!prefs.compactMode);
+    // Reduce motion toggles a class for CSS transitions/animations
+    root.classList.toggle('reduce-motion', !!prefs.reduceMotion);
+  }, [prefs]);
+
   const handleSave = () => {
-    console.log('Saved preferences', { theme, prefs });
-    alert('Preferences saved (mock).');
+    // Already persisted in effects; keep button for UX confirmation
+    alert('Preferences saved.');
   };
 
   return (

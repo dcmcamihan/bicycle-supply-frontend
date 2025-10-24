@@ -118,6 +118,7 @@ const SalesReports = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [dateRange, setDateRange] = useState('last7days');
   const [reportType, setReportType] = useState('daily');
+  const [chartTimeframe, setChartTimeframe] = useState('daily');
   const [isLoading, setIsLoading] = useState(false);
 
   // KPI data state
@@ -340,7 +341,7 @@ const SalesReports = () => {
     fetchKpisAndTransactions();
   }, [dateRange]);
 
-  // Real sales chart data from API
+  // Real sales chart data from API (aggregated by chartTimeframe)
   const [salesChartData, setSalesChartData] = useState([
     { name: 'Mon', sales: 0, transactions: 0, avgOrder: 0 },
     { name: 'Tue', sales: 0, transactions: 0, avgOrder: 0 },
@@ -361,45 +362,44 @@ const SalesReports = () => {
           const saleDate = new Date(sale.sale_date);
           return saleDate >= start && saleDate < end;
         });
-        // Group by day of week
-        const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        const chartMap = {
-          'Mon': { sales: 0, transactions: 0, avgOrder: 0 },
-          'Tue': { sales: 0, transactions: 0, avgOrder: 0 },
-          'Wed': { sales: 0, transactions: 0, avgOrder: 0 },
-          'Thu': { sales: 0, transactions: 0, avgOrder: 0 },
-          'Fri': { sales: 0, transactions: 0, avgOrder: 0 },
-          'Sat': { sales: 0, transactions: 0, avgOrder: 0 },
-          'Sun': { sales: 0, transactions: 0, avgOrder: 0 }
+        // Aggregate by timeframe
+        const aggMap = new Map(); // key -> { name, sales, transactions }
+        const addPoint = (key, name, amount) => {
+          const cur = aggMap.get(key) || { name, sales: 0, transactions: 0 };
+          cur.sales += amount;
+          cur.transactions += 1;
+          aggMap.set(key, cur);
         };
         for (const sale of filteredSales) {
           const dateObj = new Date(sale.sale_date);
-          const dayName = weekDays[dateObj.getDay()];
           let totalAmount = 0;
           try {
             const { totalAmount: amt } = await getSaleDetailsAndAmount(sale.sale_id);
             totalAmount = amt;
-          } catch {
-            totalAmount = 0;
+          } catch { totalAmount = 0; }
+          if (chartTimeframe === 'hourly') {
+            const h = dateObj.getHours();
+            const key = String(h).padStart(2, '0');
+            addPoint(key, `${key}:00`, totalAmount);
+          } else if (chartTimeframe === 'daily') {
+            const label = dateObj.toISOString().split('T')[0];
+            addPoint(label, label, totalAmount);
+          } else if (chartTimeframe === 'weekly') {
+            const d = new Date(dateObj);
+            const day = (d.getDay()+6)%7; // ISO: Mon=0..Sun=6
+            d.setDate(d.getDate()-day);
+            const key = d.toISOString().split('T')[0];
+            addPoint(key, `Week of ${key}`, totalAmount);
+          } else if (chartTimeframe === 'monthly') {
+            const key = `${dateObj.getFullYear()}-${String(dateObj.getMonth()+1).padStart(2,'0')}`;
+            const name = new Date(dateObj.getFullYear(), dateObj.getMonth(), 1).toLocaleString(undefined, { month: 'short', year: 'numeric' });
+            addPoint(key, name, totalAmount);
           }
-          chartMap[dayName].sales += totalAmount;
-          chartMap[dayName].transactions += 1;
         }
-        // Calculate avgOrder for each day
-        for (const day of weekDays) {
-          const t = chartMap[day].transactions;
-          chartMap[day].avgOrder = t > 0 ? chartMap[day].sales / t : 0;
-        }
-        // Set in Mon-Sun order
-        setSalesChartData([
-          { name: 'Mon', ...chartMap['Mon'] },
-          { name: 'Tue', ...chartMap['Tue'] },
-          { name: 'Wed', ...chartMap['Wed'] },
-          { name: 'Thu', ...chartMap['Thu'] },
-          { name: 'Fri', ...chartMap['Fri'] },
-          { name: 'Sat', ...chartMap['Sat'] },
-          { name: 'Sun', ...chartMap['Sun'] }
-        ]);
+        // Build sorted series
+        let series = Array.from(aggMap.entries()).map(([k, v]) => ({ name: v.name, sales: v.sales, transactions: v.transactions, avgOrder: v.transactions>0 ? v.sales/v.transactions : 0, key: k }));
+        series.sort((a,b) => a.key.localeCompare(b.key));
+        setSalesChartData(series.map(({key, ...rest}) => rest));
       } catch (e) {
         // fallback to empty data
         setSalesChartData([
@@ -414,7 +414,7 @@ const SalesReports = () => {
       }
     };
     fetchSalesChartData();
-  }, [dateRange]);
+  }, [dateRange, chartTimeframe]);
 
   // Mock category data
   const categoryData = [
@@ -947,6 +947,8 @@ const SalesReports = () => {
             <SalesChart 
               data={salesChartData} 
               title="Sales Trends"
+              timeframe={chartTimeframe}
+              onTimeframeChange={setChartTimeframe}
             />
             <CategoryChart 
               data={categoryData} 

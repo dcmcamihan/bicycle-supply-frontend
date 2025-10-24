@@ -9,9 +9,11 @@ const HelpSupport = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const faqs = [
-    { q: 'How do I add a new product?', a: 'Go to Inventory > Add Product and fill in the details.' },
-    { q: 'How can I process a sale?', a: 'Open the Point of Sale page, add items to the cart, and complete payment.' },
-    { q: 'Who can change settings?', a: 'Only users with the Manager role can change global settings.' },
+    { q: 'How do I add a new product?', a: 'Go to Inventory > Add Product and fill in the required details. After creating, you can restock via Create Purchase Order.' },
+    { q: 'How can I process a sale?', a: 'Open Point of Sale, scan or search products, then proceed to payment and receipt.' },
+    { q: 'Who can change settings?', a: 'Only users with the Manager role can change global settings. Individual preferences are per-user.' },
+    { q: 'How do I reorder low-stock items?', a: 'From Inventory, use Low Stock Alerts > Reorder to open a prefilled purchase order modal.' },
+    { q: 'How do I reset my password?', a: 'Use Forgot Password on the login screen. You will receive a reset token to set a new password.' },
   ];
 
   return (
@@ -41,7 +43,7 @@ const HelpSupport = () => {
                   <div className="font-medium">Contact Us</div>
                 </div>
                 <div className="text-sm text-muted-foreground mb-3">Email our support team for assistance.</div>
-                <a href="mailto:support@bikeshoppro.com" className="inline-block">
+                <a href={`mailto:support@bikeshoppro.com?subject=${encodeURIComponent('Support Request')}&body=${encodeURIComponent('Describe your issue or question here.')}`} className="inline-block">
                   <Button variant="outline" iconName="Mail" iconPosition="left" iconSize={16}>Email Support</Button>
                 </a>
               </div>
@@ -51,7 +53,17 @@ const HelpSupport = () => {
                   <div className="font-medium">Documentation</div>
                 </div>
                 <div className="text-sm text-muted-foreground mb-3">Read guides and best practices.</div>
-                <a href="#" onClick={(e)=>e.preventDefault()} className="text-primary font-medium text-sm">Coming soon</a>
+                <a href="#docs" onClick={(e)=>e.preventDefault()} className="text-primary font-medium text-sm">User Guide (coming soon)</a>
+              </div>
+              <div className="bg-card border border-border rounded-lg p-4">
+                <div className="flex items-center space-x-2 mb-2">
+                  <Icon name="AlertTriangle" size={16} />
+                  <div className="font-medium">Report an Issue</div>
+                </div>
+                <div className="text-sm text-muted-foreground mb-3">Found a bug or need urgent help? Send us diagnostics.</div>
+                <a href={`mailto:support@bikeshoppro.com?subject=${encodeURIComponent('Bug Report')}&body=${encodeURIComponent('Describe the problem, steps to reproduce, and screenshots/attachments if any.')}`} className="inline-block">
+                  <Button variant="outline" iconName="Bug" iconPosition="left" iconSize={16}>Report a Bug</Button>
+                </a>
               </div>
             </div>
           </div>
