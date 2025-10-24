@@ -1,10 +1,14 @@
 import React, { useMemo, useState } from 'react';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
+import CreatePurchaseOrderModal from './CreatePurchaseOrderModal';
+import SalesHistoryModal from './SalesHistoryModal';
 
 const ProductActions = ({ product, onEdit, onDelete, onAddToCart, onAdjustStock, stats }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showPO, setShowPO] = useState(false);
+  const [showSales, setShowSales] = useState(false);
 
   const formatted = useMemo(() => {
     const revenue = Number(stats?.revenue || 0);
@@ -93,6 +97,7 @@ const ProductActions = ({ product, onEdit, onDelete, onAddToCart, onAdjustStock,
             iconPosition="left"
             iconSize={16}
             fullWidth
+            onClick={() => setShowPO(true)}
           >
             Create Purchase Order
           </Button>
@@ -103,6 +108,7 @@ const ProductActions = ({ product, onEdit, onDelete, onAddToCart, onAdjustStock,
             iconPosition="left"
             iconSize={16}
             fullWidth
+            onClick={() => setShowSales(true)}
           >
             View Sales History
           </Button>
@@ -194,6 +200,19 @@ const ProductActions = ({ product, onEdit, onDelete, onAddToCart, onAdjustStock,
           </div>
         </div>
       </div>
+
+      {/* Modals */}
+      <CreatePurchaseOrderModal
+        isOpen={showPO}
+        onClose={() => setShowPO(false)}
+        productId={product?.id}
+        onCreated={() => setShowPO(false)}
+      />
+      <SalesHistoryModal
+        isOpen={showSales}
+        onClose={() => setShowSales(false)}
+        productId={product?.id}
+      />
     </div>
   );
 };

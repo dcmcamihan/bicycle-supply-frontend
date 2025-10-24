@@ -12,6 +12,8 @@ const ProductInfoTabs = ({ product, isEditing, onToggleEdit, onSave, refreshToke
   const [currentStock, setCurrentStock] = useState(0);
   const [movements, setMovements] = useState([]);
   const [loadingMovements, setLoadingMovements] = useState(false);
+  const [movementPage, setMovementPage] = useState(1);
+  const MOVEMENTS_PER_PAGE = 5;
   
 
   // Sync editedProduct with product only when product changes, not on every render or edit toggle
@@ -95,6 +97,7 @@ const ProductInfoTabs = ({ product, isEditing, onToggleEdit, onSave, refreshToke
         // Sort movements by date desc (newest first)
         all.sort((a,b) => new Date(b.date) - new Date(a.date));
         setMovements(all);
+        setMovementPage(1);
       } catch {
         setMovements([]);
       } finally {
@@ -187,7 +190,7 @@ const ProductInfoTabs = ({ product, isEditing, onToggleEdit, onSave, refreshToke
           type="text"
           value={editedProduct.id}
           onChange={(e) => handleInputChange('id', e.target.value)}
-          disabled={!isEditing}
+          disabled
           required
         />
       </div>
@@ -309,7 +312,7 @@ const ProductInfoTabs = ({ product, isEditing, onToggleEdit, onSave, refreshToke
           ) : movements.length === 0 ? (
             <p className="font-caption text-sm text-muted-foreground">No movement history available.</p>
           ) : (
-            movements.map((movement, index) => (
+            movements.slice((movementPage-1)*MOVEMENTS_PER_PAGE, movementPage*MOVEMENTS_PER_PAGE).map((movement, index) => (
               <div key={index} className="flex items-center justify-between py-2 border-b border-border last:border-b-0">
                 <div className="flex items-center space-x-3">
                   <Icon 
@@ -336,6 +339,28 @@ const ProductInfoTabs = ({ product, isEditing, onToggleEdit, onSave, refreshToke
             ))
           )}
         </div>
+        {/* Pagination Controls */}
+        {movements.length > MOVEMENTS_PER_PAGE && (
+          <div className="mt-3 flex items-center justify-between">
+            <button
+              className="px-3 py-1 text-sm border border-border rounded disabled:opacity-50"
+              onClick={() => setMovementPage(p => Math.max(1, p-1))}
+              disabled={movementPage === 1}
+            >
+              Previous
+            </button>
+            <span className="text-xs text-muted-foreground">
+              Page {movementPage} of {Math.ceil(movements.length / MOVEMENTS_PER_PAGE)}
+            </span>
+            <button
+              className="px-3 py-1 text-sm border border-border rounded disabled:opacity-50"
+              onClick={() => setMovementPage(p => Math.min(Math.ceil(movements.length / MOVEMENTS_PER_PAGE), p+1))}
+              disabled={movementPage >= Math.ceil(movements.length / MOVEMENTS_PER_PAGE)}
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

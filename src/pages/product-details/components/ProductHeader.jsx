@@ -91,32 +91,7 @@ const ProductHeader = ({ product, isEditing, onToggleEdit, onDuplicate, onDelete
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row lg:flex-col xl:flex-row space-y-2 sm:space-y-0 sm:space-x-2 lg:space-x-0 lg:space-y-2 xl:space-y-0 xl:space-x-2">
-          <Button
-            variant={isEditing ? "default" : "outline"}
-            onClick={onToggleEdit}
-            iconName={isEditing ? "Save" : "Edit"}
-            iconPosition="left"
-            iconSize={16}
-            className="w-full sm:w-auto"
-          >
-            {isEditing ? 'Save' : 'Edit'}
-          </Button>
-          
-          
-          
-          <Button
-            variant="destructive"
-            onClick={onDelete}
-            iconName="Trash2"
-            iconPosition="left"
-            iconSize={16}
-            className="w-full sm:w-auto"
-          >
-            Delete
-          </Button>
-        </div>
+        
       </div>
       
     </div>
