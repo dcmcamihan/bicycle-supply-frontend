@@ -10,7 +10,9 @@ const ReportHeader = ({
   onReportTypeChange,
   onExportPDF,
   onExportExcel,
-  onRefresh 
+  onRefresh,
+  customRange,
+  onCustomRangeChange,
 }) => {
   const [isExporting, setIsExporting] = useState(false);
 
@@ -125,7 +127,7 @@ const ReportHeader = ({
       </div>
 
       {/* Custom Date Range Inputs */}
-      {(dateRange === 'custom' || reportType === 'custom') && (
+      {(dateRange === 'custom' || reportType === 'custom' || (typeof dateRange === 'object' && dateRange)) && (
         <div className="mt-4 pt-4 border-t border-border">
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1">
@@ -135,7 +137,8 @@ const ReportHeader = ({
               <input
                 type="date"
                 className="w-full px-3 py-2 bg-input border border-border rounded-lg font-body text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-smooth"
-                defaultValue="2025-08-16"
+                value={customRange?.start || ''}
+                onChange={(e)=> onCustomRangeChange?.({ ...customRange, start: e.target.value })}
               />
             </div>
             <div className="flex-1">
@@ -145,7 +148,8 @@ const ReportHeader = ({
               <input
                 type="date"
                 className="w-full px-3 py-2 bg-input border border-border rounded-lg font-body text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-smooth"
-                defaultValue="2025-08-23"
+                value={customRange?.end || ''}
+                onChange={(e)=> onCustomRangeChange?.({ ...customRange, end: e.target.value })}
               />
             </div>
           </div>

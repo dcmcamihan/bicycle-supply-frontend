@@ -118,6 +118,7 @@ const SalesReports = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [dateRange, setDateRange] = useState('last7days');
   const [reportType, setReportType] = useState('daily');
+  const [customRange, setCustomRange] = useState({ start: '', end: '' });
   const [chartTimeframe, setChartTimeframe] = useState('daily');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -241,13 +242,42 @@ const SalesReports = () => {
             hourAgg.set(hour, existingHour);
           } catch {}
         }
+        // Compute previous period bounds for KPI change
+        const msPerDay = 24*60*60*1000;
+        const curLenDays = Math.max(1, Math.round((end - start) / msPerDay));
+        const prevEnd = new Date(start);
+        const prevStart = new Date(start.getTime() - curLenDays * msPerDay);
+        const prevSales = sales.filter(sale => {
+          if (!sale.sale_date) return false;
+          const d = new Date(sale.sale_date);
+          return d >= prevStart && d < prevEnd;
+        });
+        let prevTotalSales = 0;
+        const prevProductCountMap = new Map();
+        for (const sale of prevSales) {
+          try {
+            const { details, totalAmount } = await getSaleDetailsAndAmount(sale.sale_id);
+            prevTotalSales += totalAmount;
+            for (const detail of details) {
+              if (detail.product_id) prevProductCountMap.set(
+                detail.product_id,
+                (prevProductCountMap.get(detail.product_id) || 0) + (detail.quantity_sold || 0)
+              );
+            }
+          } catch {}
+        }
+        const prevTxCount = prevSales.length;
+        const prevAvgOrder = prevTxCount > 0 ? prevTotalSales / prevTxCount : 0;
+        const prevTopProductsCount = prevProductCountMap.size;
+
         const avgOrder = filteredSales.length > 0 ? totalSales / filteredSales.length : 0;
         const topProductsCount = productCountMap.size;
+        const pct = (cur, prev) => prev > 0 ? ((cur - prev) / prev) * 100 : (cur > 0 ? 100 : 0);
         setKpiData(prev => prev.map(kpi => {
-          if (kpi.title === 'Total Sales') return { ...kpi, value: totalSales };
-          if (kpi.title === 'Transactions') return { ...kpi, value: filteredSales.length };
-          if (kpi.title === 'Average Order') return { ...kpi, value: avgOrder };
-          if (kpi.title === 'Top Products') return { ...kpi, value: topProductsCount };
+          if (kpi.title === 'Total Sales') return { ...kpi, value: totalSales, change: pct(totalSales, prevTotalSales), period: 'vs prev' };
+          if (kpi.title === 'Transactions') return { ...kpi, value: filteredSales.length, change: pct(filteredSales.length, prevTxCount), period: 'vs prev' };
+          if (kpi.title === 'Average Order') return { ...kpi, value: avgOrder, change: pct(avgOrder, prevAvgOrder), period: 'vs prev' };
+          if (kpi.title === 'Top Products') return { ...kpi, value: topProductsCount, change: pct(topProductsCount, prevTopProductsCount), period: 'vs prev' };
           return kpi;
         }));
 
@@ -449,15 +479,28 @@ const SalesReports = () => {
   };
 
   const handleDateRangeChange = (newRange) => {
-    setDateRange(newRange);
-    // In a real app, this would trigger data refetch
-    console.log('Date range changed to:', newRange);
+    if (newRange === 'custom') {
+      // Use current custom range object for filtering
+      setDateRange({ ...customRange });
+    } else {
+      setDateRange(newRange);
+    }
   };
 
   const handleReportTypeChange = (newType) => {
     setReportType(newType);
-    // In a real app, this would trigger data refetch
-    console.log('Report type changed to:', newType);
+    if (newType === 'daily' || newType === 'weekly' || newType === 'monthly') {
+      setChartTimeframe(newType);
+    }
+    // If reportType is 'custom', dateRange inputs will show; leave timeframe as-is
+  };
+
+  const handleCustomRangeChange = (range) => {
+    setCustomRange(range);
+    // If currently on custom, push updates to active dateRange
+    if (typeof dateRange === 'object') {
+      setDateRange({ ...range });
+    }
   };
 
   const handleExportPDF = async () => {
@@ -934,9 +977,17 @@ const SalesReports = () => {
             onDateRangeChange={handleDateRangeChange}
             reportType={reportType}
             onReportTypeChange={handleReportTypeChange}
+            customRange={customRange}
+            onCustomRangeChange={handleCustomRangeChange}
             onExportPDF={handleExportPDF}
             onExportExcel={handleExportExcel}
-            onRefresh={handleRefresh}
+            onRefresh={() => {
+              // Re-trigger loads by touching state
+              setIsLoading(true);
+              setTimeout(() => {
+                setIsLoading(false);
+              }, 1000);
+            }}
           />
 
           {/* KPI Cards */}
