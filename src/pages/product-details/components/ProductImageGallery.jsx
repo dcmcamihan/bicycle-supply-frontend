@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import API_ENDPOINTS from '../../../config/api';
 import Image from '../../../components/AppImage';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
@@ -6,13 +7,31 @@ import Button from '../../../components/ui/Button';
 const ProductImageGallery = ({ product }) => {
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [isZoomed, setIsZoomed] = useState(false);
+  const [productImages, setProductImages] = useState([]);
 
-  const productImages = [
-    product?.image,
-    "https://images.pexels.com/photos/100582/pexels-photo-100582.jpeg?auto=compress&cs=tinysrgb&w=800",
-    "https://images.pexels.com/photos/276517/pexels-photo-276517.jpeg?auto=compress&cs=tinysrgb&w=800",
-    "https://images.pexels.com/photos/544966/pexels-photo-544966.jpeg?auto=compress&cs=tinysrgb&w=800"
-  ];
+  React.useEffect(() => {
+    const fetchImages = async () => {
+      if (!product?.id) return;
+      try {
+        const res = await fetch(
+          API_ENDPOINTS.PRODUCT_IMAGES_BY_PRODUCT(product.id)
+        );
+        if (!res.ok) throw new Error('Failed to fetch product images');
+        const data = await res.json();
+        // Use image_url from API, fallback to product.image if no images
+        if (Array.isArray(data) && data.length > 0) {
+          setProductImages(data.map(img => img.image_url));
+        } else if (product?.image) {
+          setProductImages([product.image]);
+        } else {
+          setProductImages([]);
+        }
+      } catch {
+        setProductImages(product?.image ? [product.image] : []);
+      }
+    };
+    fetchImages();
+  }, [product?.id, product?.image]);
 
   const handlePrevImage = () => {
     setSelectedImageIndex((prev) => 
