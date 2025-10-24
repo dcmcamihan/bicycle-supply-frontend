@@ -15,6 +15,7 @@ import PointOfSale from './pages/point-of-sale';
 import ProfileSettings from './pages/settings/ProfileSettings';
 import Preferences from './pages/settings/Preferences';
 import HelpSupport from './pages/support/HelpSupport';
+import ProcessReturn from './pages/returns/ProcessReturn';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 const PrivateRoute = ({ element }) => {
@@ -41,6 +42,7 @@ const Routes = () => {
           <Route path="/product-details" element={<PrivateRoute element={<ProductDetails />} />} />
           <Route path="/sales-reports" element={<PrivateRoute element={<SalesReports />} />} />
           <Route path="/point-of-sale" element={<PrivateRoute element={<PointOfSale />} />} />
+          <Route path="/returns/process" element={<PrivateRoute element={<ProcessReturn />} />} />
           <Route path="/settings/profile" element={<PrivateRoute element={<ProfileSettings />} />} />
           <Route path="/settings/preferences" element={<PrivateRoute element={<Preferences />} />} />
           <Route path="/help-support" element={<PrivateRoute element={<HelpSupport />} />} />

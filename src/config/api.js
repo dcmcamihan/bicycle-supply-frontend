@@ -84,11 +84,6 @@ export const API_ENDPOINTS = {
   STOCKOUT: (id) => `${API_BASE_URL}/stockouts/${id}`,
   STOCKOUT_DETAILS: `${API_BASE_URL}/stockout-details`, // GET all, POST new
   STOCKOUT_DETAILS_BY_STOCKOUT: (stockoutId) => `${API_BASE_URL}/stockout-details/stockout/${stockoutId}`,
-
-  // Product Images
-  PRODUCT_IMAGES: `${API_BASE_URL}/product-images`, // GET all, POST new
-  PRODUCT_IMAGES_BY_PRODUCT: (productId) => `${API_BASE_URL}/product-images/product/${productId}`,
-  PRODUCT_IMAGE: (productImageId) => `${API_BASE_URL}/product-images/${productImageId}`,
 }; 
 
 export default API_ENDPOINTS;

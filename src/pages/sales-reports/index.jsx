@@ -8,6 +8,7 @@ import Sidebar from '../../components/ui/Sidebar';
 import Breadcrumb from '../../components/ui/Breadcrumb';
 import ReportHeader from './components/ReportHeader';
 import KPICards from './components/KPICards';
+import StockMovement from './components/StockMovement';
 import SalesChart from './components/SalesChart';
 import CategoryChart from './components/CategoryChart';
 import TransactionTable from './components/TransactionTable';
@@ -121,6 +122,8 @@ const SalesReports = () => {
   const [customRange, setCustomRange] = useState({ start: '', end: '' });
   const [chartTimeframe, setChartTimeframe] = useState('daily');
   const [isLoading, setIsLoading] = useState(false);
+  const [stockAdjustments, setStockAdjustments] = useState([]);
+  const [stockMovements, setStockMovements] = useState([]);
 
   // KPI data state
   const [kpiData, setKpiData] = useState([
@@ -370,6 +373,89 @@ const SalesReports = () => {
     };
     fetchKpisAndTransactions();
   }, [dateRange]);
+
+  // Load stock adjustments and filter by dateRange
+  useEffect(() => {
+    const loadAdjustments = async () => {
+      try {
+        const res = await fetch(API_ENDPOINTS.STOCK_ADJUSTMENTS);
+        const all = res.ok ? await res.json() : [];
+        const { start, end } = getDateRangeBounds(dateRange);
+        const filtered = (all || []).filter(a => {
+          if (!a.transaction_date) return false;
+          const d = new Date(a.transaction_date);
+          return d >= start && d < end;
+        });
+        setStockAdjustments(filtered);
+      } catch { setStockAdjustments([]); }
+    };
+    loadAdjustments();
+  }, [dateRange]);
+
+  // Load supplies and stockouts, then merge with adjustments into a single movement stream
+  useEffect(() => {
+    const loadMovements = async () => {
+      const { start, end } = getDateRangeBounds(dateRange);
+      const movements = [];
+      // Supplies -> fetch headers, then details per supply
+      try {
+        const sRes = await fetch(API_ENDPOINTS.SUPPLIES);
+        const supplies = sRes.ok ? await sRes.json() : [];
+        const sFiltered = (supplies || []).filter(s => {
+          const d = s?.supply_date ? new Date(s.supply_date) : null;
+          return d && d >= start && d < end;
+        });
+        for (const s of sFiltered) {
+          let lines = [];
+          try {
+            const dRes = await fetch(API_ENDPOINTS.SUPPLY_DETAILS_BY_SUPPLY(s.supply_id || s.id));
+            if (dRes.ok) {
+              const det = await dRes.json();
+              lines = (det || []).map(d => ({ product_id: d.product_id, quantity: Number(d.quantity_supplied)||0 }));
+            }
+          } catch {}
+          movements.push({ date: s.supply_date, type: 'Supply', remarks: s.status || '', lines });
+        }
+      } catch {}
+      // Stockouts -> use header; if details endpoint exists, prefer it
+      try {
+        const soRes = await fetch(API_ENDPOINTS.STOCKOUTS);
+        const outs = soRes.ok ? await soRes.json() : [];
+        const oFiltered = (outs || []).filter(o => {
+          const d = o?.stockout_date ? new Date(o.stockout_date) : null;
+          return d && d >= start && d < end;
+        });
+        for (const o of oFiltered) {
+          let lines = [];
+          // Try details
+          try {
+            if (API_ENDPOINTS.STOCKOUT_DETAILS_BY_STOCKOUT && (o.stockout_id || o.id)) {
+              const dRes = await fetch(API_ENDPOINTS.STOCKOUT_DETAILS_BY_STOCKOUT(o.stockout_id || o.id));
+              if (dRes.ok) {
+                const det = await dRes.json();
+                lines = (det || []).map(d => ({ product_id: d.product_id, quantity: -(Number(d.quantity_removed)||0) }));
+              }
+            }
+          } catch {}
+          if (lines.length === 0 && o.product_id) {
+            lines = [{ product_id: o.product_id, quantity: -(Number(o.quantity_removed)||0) }];
+          }
+          movements.push({ date: o.stockout_date, type: 'Stockout', remarks: o.reason || '', lines });
+        }
+      } catch {}
+      // Adjustments already loaded -> map into movements
+      try {
+        for (const a of stockAdjustments) {
+          const lines = (a.details || []).map(d => ({ product_id: d.product_id, quantity: Number(d.quantity)||0 }));
+          movements.push({ date: a.transaction_date, type: 'Adjustment', remarks: a.remarks || '', lines });
+        }
+      } catch {}
+      // Sort desc by date
+      movements.sort((x,y) => new Date(y.date) - new Date(x.date));
+      setStockMovements(movements);
+    };
+    loadMovements();
+  }, [dateRange, stockAdjustments]);
 
   // Real sales chart data from API (aggregated by chartTimeframe)
   const [salesChartData, setSalesChartData] = useState([
@@ -1011,7 +1097,7 @@ const SalesReports = () => {
           {/* Main Content Grid */}
           <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
             {/* Transaction Table */}
-            <div className="xl:col-span-4">
+            <div className="xl:col-span-3 space-y-6">
               <TransactionTable transactions={transactionsData} key={JSON.stringify(transactionsData)} />
             </div>
           </div>
@@ -1022,6 +1108,11 @@ const SalesReports = () => {
             <PaymentDistribution data={paymentDistribution} />
             <StaffPerformance data={staffPerformance} />
             <PeakHours data={peakHours} />
+          </div>
+
+          {/* Stock Movement */}
+          <div className="space-y-6">
+            <StockMovement movements={stockMovements} />
           </div>
 
           {/* Loading Overlay */}

@@ -26,7 +26,7 @@ const QuickActions = () => {
       description: 'Handle customer returns',
       icon: 'RotateCcw',
       color: 'bg-warning text-warning-foreground',
-      onClick: () => console.log('Process return clicked')
+      onClick: () => navigate('/returns/process')
     },
     {
       title: 'View Reports',

@@ -8,6 +8,11 @@ const AdjustStockModal = ({ isOpen, onClose, productId, currentQoh = 0, onAdjust
   const [delta, setDelta] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [history, setHistory] = useState([]); // {date, type, quantity, ref, notes}
+  const [historyEdits, setHistoryEdits] = useState([]); // editable quantities per row
+  const [page, setPage] = useState(1);
+  const pageSize = 5; // fixed rows per page
 
   // Required fields for Supply
   const [supplierId, setSupplierId] = useState(null);
@@ -66,248 +71,166 @@ const AdjustStockModal = ({ isOpen, onClose, productId, currentQoh = 0, onAdjust
     if (isOpen) init();
   }, [isOpen, productId]);
 
+  // Load stock history (read-only UI)
+  useEffect(() => {
+    const loadHistory = async () => {
+      setHistoryLoading(true);
+      const rows = [];
+      try {
+        // Supplies -> positive qty
+        const sdRes = await fetch(API_ENDPOINTS.SUPPLY_DETAILS);
+        if (sdRes.ok) {
+          const sds = await sdRes.json();
+          const filtered = (sds || []).filter(d => Number(d.product_id) === Number(productId));
+          // Map each with supply header date if available
+          for (const d of filtered) {
+            let date = null;
+            try {
+              if (d.supply_id) {
+                const sRes = await fetch(API_ENDPOINTS.SUPPLY(d.supply_id));
+                if (sRes.ok) {
+                  const s = await sRes.json();
+                  date = s?.supply_date || null;
+                }
+              }
+            } catch {}
+            rows.push({ date: date || d.created_at || new Date().toISOString(), type: 'Supply', quantity: Number(d.quantity_supplied)||0, ref: d.supply_id ? `Supply #${d.supply_id}` : '-', notes: '' });
+          }
+        }
+      } catch {}
+      try {
+        // Stockouts -> negative qty
+        const soRes = await fetch(API_ENDPOINTS.STOCKOUTS);
+        if (soRes.ok) {
+          const sos = await soRes.json();
+          const filtered = (sos || []).filter(o => Number(o.product_id) === Number(productId));
+          for (const o of filtered) {
+            rows.push({ date: o.stockout_date || o.created_at || new Date().toISOString(), type: 'Stockout', quantity: -Math.abs(Number(o.quantity_removed)||0), ref: o.stockout_id ? `Stockout #${o.stockout_id}` : '-', notes: o.reason || '' });
+          }
+        }
+      } catch {}
+      try {
+        // Stock Adjustments -> +/- qty from details
+        const adjRes = await fetch(API_ENDPOINTS.STOCK_ADJUSTMENTS);
+        if (adjRes.ok) {
+          const adjs = await adjRes.json();
+          for (const a of (adjs || [])) {
+            const details = a.details || [];
+            for (const d of details) {
+              if (Number(d.product_id) === Number(productId)) {
+                rows.push({ date: a.transaction_date || new Date().toISOString(), type: 'Adjustment', quantity: Number(d.quantity)||0, ref: a.adjustment_id ? `Adj #${a.adjustment_id}` : '-', notes: a.remarks || '' });
+              }
+            }
+          }
+        }
+      } catch {}
+      // Sort desc date
+      rows.sort((a,b) => new Date(b.date) - new Date(a.date));
+      setHistory(rows);
+      setHistoryEdits(rows.map(r => Number(r.quantity) || 0));
+      setHistoryLoading(false);
+    };
+    if (isOpen && productId) loadHistory();
+  }, [isOpen, productId]);
+
+  const totalPages = Math.max(1, Math.ceil(history.length / pageSize));
+  const startIdx = (page - 1) * pageSize;
+  const pageRows = history.slice(startIdx, startIdx + pageSize);
+
   if (!isOpen) return null;
 
   const handleAdjust = async () => {
     setError('');
-    const change = Number(delta);
-    if (Number.isNaN(change) || change === 0) {
-      setError('Enter a non-zero number. Use positive to add stock, negative to reduce.');
-      return;
-    }
-    // Bounds check for negative adjustments
-    if (change < 0 && Math.abs(change) > Number(currentQoh || 0)) {
-      setError('Adjustment exceeds current stock. Cannot reduce below zero.');
-      return;
-    }
-    if (change > 0) {
-      if (!supplierId) return setError('Supplier is required for restock.');
-      if (!paymentMethodCode) return setError('Payment method is required.');
-      if (!saleAttendant) return setError('Sale attendant is required.');
-      if (!manager) return setError('Manager is required.');
-    }
+    // Compute total delta from edits vs original quantities
+    const totalDelta = historyEdits.reduce((sum, v, i) => sum + ((Number(v)||0) - (Number(history[i]?.quantity)||0)), 0);
     setLoading(true);
-    try {
-      if (change > 0) {
-        // Create a supply, then supply detail
-        const supplyPayload = {
-          supplier_id: parseInt(supplierId),
-          payment_method_code: paymentMethodCode,
-          sale_attendant: parseInt(saleAttendant),
-          manager: parseInt(manager),
-          supply_date: new Date().toISOString(),
-          status: 'Received'
-        };
-        const sRes = await fetch(API_ENDPOINTS.SUPPLIES, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(supplyPayload)
-        });
-        if (!sRes.ok) {
-          const t = await sRes.text();
-          throw new Error(t || 'Failed to create supply');
-        }
-        const supply = await sRes.json();
-        const supplyId = supply?.supply_id || supply?.id;
-        if (!supplyId) throw new Error('Missing supply_id from response');
-        const sdPayload = {
-          supply_id: supplyId,
-          product_id: Number(productId),
-          quantity_supplied: change
-        };
-        const sdRes = await fetch(API_ENDPOINTS.SUPPLY_DETAILS, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(sdPayload)
-        });
-        if (!sdRes.ok) {
-          const t = await sdRes.text();
-          throw new Error(t || 'Failed to create supply detail');
-        }
-      } else {
-        // Negative adjustment -> create stockout then stockout detail
-        if (!saleAttendant) return setError('Sale attendant is required.');
-        if (!manager) return setError('Manager is required.');
-        const stockoutPayload = {
-          stockout_date: new Date().toISOString(),
-          sale_attendant: parseInt(saleAttendant),
-          manager: parseInt(manager),
-          reason: reason || 'Inventory adjustment',
-          product_id: Number(productId),
-          quantity_removed: Math.abs(change)
-        };
-        const soRes = await fetch(API_ENDPOINTS.STOCKOUTS, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(stockoutPayload)
-        });
-        if (!soRes.ok) {
-          const t = await soRes.text();
-          throw new Error(t || 'Failed to create stockout');
-        }
-        const stockout = await soRes.json();
-        const stockoutId = stockout?.stockout_id || stockout?.id;
-        // Some backends do not require a separate stockout-details table
-        if (stockoutId && API_ENDPOINTS.STOCKOUT_DETAILS) {
-          try {
-            const sodPayload = {
-              stockout_id: stockoutId,
-              product_id: Number(productId),
-              quantity_removed: Math.abs(change)
-            };
-            const sodRes = await fetch(API_ENDPOINTS.STOCKOUT_DETAILS, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(sodPayload)
-            });
-            if (!sodRes.ok) {
-              // If endpoint doesn't exist, proceed without details
-              if (sodRes.status !== 404) {
-                const t = await sodRes.text();
-                throw new Error(t || 'Failed to create stockout detail');
-              }
-            }
-          } catch (innerErr) {
-            // If 404 or network, we continue, as stockout may already have product/quantity
-            // console.warn('Stockout detail post skipped:', innerErr);
-          }
-        }
-
-        // Fallback to synthetic sale so QOH reflects the decrease via sales-based computation
-        try {
-          // fetch product price for realistic sale totals
-          let unitPrice = 0;
-          try {
-            const pRes = await fetch(API_ENDPOINTS.PRODUCT(productId));
-            if (pRes.ok) {
-              const pdata = await pRes.json();
-              unitPrice = Number(pdata?.price) || 0;
-            }
-          } catch {}
-          const qty = Math.abs(change);
-          const salePayload = {
-            sale_date: new Date().toISOString(),
-            cashier_id: parseInt(saleAttendant),
-            payment_method_code: 'CASH',
-            customer_id: null,
-            total_amount: unitPrice * qty,
-            status: 'Completed',
-            notes: 'Inventory adjustment (decrease)'
-          };
-          const saleRes = await fetch(API_ENDPOINTS.SALES, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(salePayload)
-          });
-          if (saleRes.ok) {
-            const sale = await saleRes.json();
-            const saleId = sale?.sale_id || sale?.id;
-            if (saleId) {
-              const sdPayload = {
-                sale_id: saleId,
-                product_id: Number(productId),
-                quantity_sold: qty,
-                unit_price: unitPrice
-              };
-              const sdRes2 = await fetch(API_ENDPOINTS.SALE_DETAILS_BASE, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(sdPayload)
-              });
-              // If details fail, still proceed to refresh; QOH may still be impacted by stockout
-            }
-          }
-        } catch (_) {
-          // Ignore synthetic sale failures; the stockout may already affect QOH in some backends
-        }
-      }
-      if (onAdjusted) await onAdjusted(Number(delta));
-      onClose();
-    } catch (e) {
-      setError(e.message || String(e));
-    } finally {
+    setTimeout(() => {
+      if (onAdjusted) onAdjusted(totalDelta);
       setLoading(false);
-    }
+      onClose();
+    }, 400);
   };
 
   return (
     <div className="fixed inset-0 z-1400 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-card border border-border rounded-lg p-6 w-full max-w-md shadow-raised">
+      <div className="relative bg-card border border-border rounded-lg p-6 w-full max-w-2xl max-h-[85vh] overflow-y-auto shadow-raised">
         <h3 className="font-heading text-lg font-semibold text-foreground mb-4">Adjust Stock</h3>
         <div className="space-y-3">
           <div className="text-sm text-muted-foreground">Current QOH: <span className="font-medium text-foreground">{currentQoh}</span></div>
-          <Input
-            label="Adjustment"
-            type="number"
-            value={delta}
-            onChange={(e) => setDelta(e.target.value)}
-            placeholder="e.g., 5 or -3"
-          />
-          {Number(delta) > 0 && (
-            <>
-              <Select
-                label="Supplier"
-                options={supplierOptions}
-                value={supplierId}
-                onChange={(v) => setSupplierId(v)}
-                placeholder="Select supplier"
-              />
-              <Select
-                label="Payment Method"
-                options={paymentOptions}
-                value={paymentMethodCode}
-                onChange={(v) => setPaymentMethodCode(v)}
-                placeholder="Select payment method"
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <Select
-                  label="Sale Attendant"
-                  options={employeeOptions}
-                  value={saleAttendant}
-                  onChange={(v) => setSaleAttendant(v)}
-                  placeholder="Select employee"
-                />
-                <Input
-                  label="Manager ID"
-                  type="number"
-                  value={manager}
-                  onChange={(e) => setManager(e.target.value)}
-                  placeholder="Manager ID"
-                />
+          {/* Per-transaction editing below; overall adjustment is computed from row edits */}
+          {/* Disabled fields retained for UI layout but not editable */}
+          <div className="opacity-60 pointer-events-none select-none">
+            <div className="grid grid-cols-2 gap-2">
+              <Select label="Supplier" options={supplierOptions} value={supplierId} onChange={()=>{}} placeholder="Select supplier" />
+              <Select label="Payment Method" options={paymentOptions} value={paymentMethodCode} onChange={()=>{}} placeholder="Select payment method" />
+            </div>
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              <Select label="Sale Attendant" options={employeeOptions} value={saleAttendant} onChange={()=>{}} placeholder="Select employee" />
+              <Input label="Manager ID" type="number" value={manager} onChange={()=>{}} placeholder="Manager ID" />
+            </div>
+            <Input className="mt-2" label="Reason" type="text" value={reason} onChange={()=>{}} placeholder="e.g., Damaged, Shrinkage" />
+          </div>
+
+          {/* Stock History */}
+          <div className="mt-4 border-t border-border pt-4">
+            <h4 className="font-body font-semibold text-sm text-foreground mb-2">Stock History</h4>
+            {historyLoading ? (
+              <div className="text-sm text-muted-foreground">Loading history…</div>
+            ) : history.length === 0 ? (
+              <div className="text-sm text-muted-foreground">No history found for this product.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-muted-foreground">
+                      <th className="py-2 pr-4">Date</th>
+                      <th className="py-2 pr-4">Quantity</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pageRows.map((h, i) => {
+                      const globalIdx = startIdx + i;
+                      return (
+                      <tr key={i} className="border-t border-border">
+                        <td className="py-2 pr-4">{new Date(h.date).toLocaleString()}</td>
+                        <td className="py-2 pr-4">
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              className="px-2 py-1 rounded bg-muted hover:bg-muted/80 border border-border"
+                              onClick={() => setHistoryEdits(prev => prev.map((v, idx) => idx===globalIdx ? (Number(v||0)-1) : v))}
+                            >−</button>
+                            <input
+                              type="number"
+                              className={`w-24 px-2 py-1 bg-input border border-border rounded font-body text-sm ${ (Number(historyEdits[i])||0) >= 0 ? 'text-success' : 'text-destructive'}`}
+                              value={historyEdits[globalIdx] ?? 0}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                setHistoryEdits(prev => prev.map((x, idx) => idx===globalIdx ? v : x));
+                              }}
+                            />
+                            <button
+                              type="button"
+                              className="px-2 py-1 rounded bg-muted hover:bg-muted/80 border border-border"
+                              onClick={() => setHistoryEdits(prev => prev.map((v, idx) => idx===globalIdx ? (Number(v||0)+1) : v))}
+                            >+</button>
+                            <span className="text-xs text-muted-foreground ml-2">Original: <span className={`font-medium ${h.quantity>=0 ? 'text-success' : 'text-destructive'}`}>{h.quantity > 0 ? `+${h.quantity}` : h.quantity}</span></span>
+                          </div>
+                        </td>
+                      </tr>
+                    )})}
+                  </tbody>
+                </table>
+                {/* Pagination controls (fixed 5 rows per page) */}
+                <div className="flex items-center justify-end mt-3 text-sm gap-2">
+                  <span className="text-muted-foreground">Page {page} of {totalPages}</span>
+                  <button className="px-2 py-1 border border-border rounded disabled:opacity-50" disabled={page<=1} onClick={()=>setPage(p=>Math.max(1,p-1))}>Prev</button>
+                  <button className="px-2 py-1 border border-border rounded disabled:opacity-50" disabled={page>=totalPages} onClick={()=>setPage(p=>Math.min(totalPages,p+1))}>Next</button>
+                </div>
               </div>
-            </>
-          )}
-          {Number(delta) < 0 && Math.abs(Number(delta)) > Number(currentQoh || 0) && (
-            <div className="text-xs text-destructive">Adjustment exceeds current stock. Please enter a value up to the current stock.</div>
-          )}
-          {Number(delta) < 0 && (
-            <>
-              <div className="grid grid-cols-2 gap-2">
-                <Select
-                  label="Sale Attendant"
-                  options={employeeOptions}
-                  value={saleAttendant}
-                  onChange={(v) => setSaleAttendant(v)}
-                  placeholder="Select employee"
-                />
-                <Input
-                  label="Manager ID"
-                  type="number"
-                  value={manager}
-                  onChange={(e) => setManager(e.target.value)}
-                  placeholder="Manager ID"
-                />
-              </div>
-              <Input
-                label="Reason"
-                type="text"
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="e.g., Damaged, Shrinkage"
-              />
-            </>
-          )}
+            )}
+          </div>
           {error && <div className="text-xs text-destructive">{error}</div>}
           <div className="flex items-center justify-end space-x-2 pt-2">
             <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
