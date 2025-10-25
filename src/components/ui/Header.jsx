@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Icon from '../AppIcon';
 import Button from './Button';
+import { getCartTotalCount } from '../../utils/posCart';
 import { useAuth } from '../../contexts/AuthContext';
 import API_ENDPOINTS from '../../config/api';
 
@@ -14,6 +15,7 @@ const Header = ({ onSidebarToggle, user = null }) => {
   const navigate = useNavigate();
   const { logout, user: ctxUser } = useAuth();
   const activeUser = user || ctxUser;
+  const [cartCount, setCartCount] = useState(() => getCartTotalCount());
 
   const handleUserMenuToggle = () => {
     setIsUserMenuOpen(!isUserMenuOpen);
@@ -152,6 +154,29 @@ const Header = ({ onSidebarToggle, user = null }) => {
     }
   };
 
+  // Update cart count when pos cart changes (same-tab via custom event, or other tabs via storage)
+  useEffect(() => {
+    const onCartUpdated = (ev) => {
+      try {
+        const total = ev?.detail?.total ?? getCartTotalCount();
+        setCartCount(Number(total) || 0);
+      } catch (e) {
+        setCartCount(getCartTotalCount());
+      }
+    };
+    const onStorage = (ev) => {
+      if (ev.key === 'pos_cart') {
+        setCartCount(getCartTotalCount());
+      }
+    };
+    window.addEventListener('pos_cart_updated', onCartUpdated);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('pos_cart_updated', onCartUpdated);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, []);
+
   return (
     <header className="fixed top-0 left-0 right-0 h-15 bg-card border-b border-border z-1000 shadow-subtle">
       <div className="flex items-center justify-between h-full px-4">
@@ -211,6 +236,26 @@ const Header = ({ onSidebarToggle, user = null }) => {
           >
             <span className="sr-only">Search</span>
           </Button>
+
+          {/* POS Cart Button with badge */}
+          <div className="relative">
+            <Link to="/point-of-sale">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="relative"
+                iconName="ShoppingCart"
+                iconSize={20}
+              >
+                <span className="sr-only">Point of Sale</span>
+              </Button>
+            </Link>
+            {cartCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-4 px-1 bg-primary rounded-full flex items-center justify-center border border-white text-[11px] text-white font-medium">
+                {cartCount}
+              </span>
+            )}
+          </div>
 
           {/* Notifications */}
           <div className="relative">

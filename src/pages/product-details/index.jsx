@@ -12,6 +12,7 @@ import ProductActions from './components/ProductActions';
 
 import Button from '../../components/ui/Button';
 import { useToast } from '../../components/ui/Toast';
+import { addToCart, getCartTotalCount } from '../../utils/posCart';
 
 const ProductDetails = () => {
   const navigate = useNavigate();
@@ -363,8 +364,28 @@ const ProductDetails = () => {
   };
 
   const handleAddToCart = (productToAdd) => {
-    console.log('Added to cart:', productToAdd);
-    // In real app, this would add the product to the shopping cart
+    try {
+      // Normalize product shape for POS
+      const normalized = {
+        id: productToAdd?.id ?? productToAdd?.product_id ?? productToAdd?.productId,
+        name: productToAdd?.name ?? productToAdd?.product_name ?? productToAdd?.productName,
+        price: Number(productToAdd?.price ?? productToAdd?.unit_price ?? 0) || 0,
+        stock: productToAdd?.stock ?? productToAdd?.quantity ?? null,
+        image_url: productToAdd?.image_url ?? productToAdd?.image ?? productToAdd?.imageUrl ?? ''
+      };
+      const updated = addToCart(normalized);
+      const total = getCartTotalCount();
+      try { toast?.success && toast.success(`Added to POS cart — ${total} item${total !== 1 ? 's' : ''}`); } catch {}
+      // Optionally navigate to POS when user wants; currently we keep them on product details
+      // navigate('/point-of-sale');
+      // For debugging maintain console output as well
+      // eslint-disable-next-line no-console
+      console.log('POS cart updated:', updated);
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to add to POS cart', e);
+      try { toast?.error && toast.error('Failed to add to POS cart'); } catch {}
+    }
   };
 
   const handleEditProduct = () => {

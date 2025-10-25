@@ -11,6 +11,7 @@ import ShoppingCart from './components/ShoppingCart';
 import PaymentMethods from './components/PaymentMethods';
 import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
+import { getCart, saveCart } from '../../utils/posCart';
 import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
 
@@ -49,7 +50,7 @@ const PointOfSale = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
-  const [cartItems, setCartItems] = useState([]);
+  const [cartItems, setCartItems] = useState(() => getCart());
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [customerName, setCustomerName] = useState('');
   const [employees, setEmployees] = useState([]);
@@ -177,6 +178,13 @@ const PointOfSale = () => {
       }
     }
   };
+
+  // Persist cart to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      saveCart(cartItems);
+    } catch (e) {}
+  }, [cartItems]);
 
   const handleUpdateQuantity = (productId, newQuantity) => {
     const product = products?.find(p => p?.id === productId);

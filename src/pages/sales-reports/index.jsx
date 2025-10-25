@@ -117,7 +117,8 @@ const SalesReports = () => {
     }
   };
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [dateRange, setDateRange] = useState('last7days');
+  // Default dateRange set to 'today' for immediate, relevant insights
+  const [dateRange, setDateRange] = useState('today');
   const [reportType, setReportType] = useState('daily');
   const [customRange, setCustomRange] = useState({ start: '', end: '' });
   const [chartTimeframe, setChartTimeframe] = useState('daily');
