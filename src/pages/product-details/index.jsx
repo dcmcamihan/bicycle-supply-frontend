@@ -24,6 +24,8 @@ const ProductDetails = () => {
   const [refreshCounter, setRefreshCounter] = useState(0);
   const [stats, setStats] = useState({ totalSold: 0, revenue: 0, lastSold: null, daysInStock: null });
   const toast = useToast();
+  const [allProducts, setAllProducts] = useState([]);
+  const [currentIndex, setCurrentIndex] = useState(-1);
 
   // Get id from URL query params
   const searchParams = new URLSearchParams(location.search);
@@ -72,6 +74,37 @@ const ProductDetails = () => {
   const [product, setProduct] = useState(defaultProduct);
 
   useEffect(() => {
+    // If no id provided, fetch first product and redirect to its details
+    const ensureProductId = async () => {
+      if (productId) return;
+      try {
+        const res = await fetch(API_ENDPOINTS.PRODUCTS);
+        if (res.ok) {
+          const list = await res.json();
+          const first = Array.isArray(list) && list.length > 0 ? list[0] : null;
+          const firstId = first?.product_id || first?.id;
+          if (firstId) {
+            const qp = new URLSearchParams();
+            qp.set('id', String(firstId));
+            if (openAdjust) qp.set('openAdjust', '1');
+            navigate(`/product-details?${qp.toString()}`, { replace: true });
+            return; // stop further fetch in this render
+          }
+        }
+      } catch {}
+    };
+    ensureProductId();
+
+    // Load all products for navigation controls
+    const loadAll = async () => {
+      try {
+        const res = await fetch(API_ENDPOINTS.PRODUCTS);
+        const data = res.ok ? await res.json() : [];
+        setAllProducts(Array.isArray(data) ? data : []);
+      } catch {}
+    };
+    loadAll();
+
     const fetchProduct = async () => {
       if (!productId) return;
       try {
@@ -137,6 +170,26 @@ const ProductDetails = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productId]);
+
+  // Track current index within allProducts
+  useEffect(() => {
+    if (!productId || !Array.isArray(allProducts)) { setCurrentIndex(-1); return; }
+    const idx = allProducts.findIndex(p => String(p.product_id || p.id) === String(productId));
+    setCurrentIndex(idx);
+  }, [productId, allProducts]);
+
+  const goToProductByIndex = (idx) => {
+    if (idx < 0 || idx >= allProducts.length) return;
+    const p = allProducts[idx];
+    const pid = p?.product_id || p?.id;
+    if (!pid) return;
+    const qp = new URLSearchParams();
+    qp.set('id', String(pid));
+    navigate(`/product-details?${qp.toString()}`);
+  };
+
+  const goPrev = () => { if (currentIndex > 0) goToProductByIndex(currentIndex - 1); };
+  const goNext = () => { if (currentIndex >= 0 && currentIndex < allProducts.length - 1) goToProductByIndex(currentIndex + 1); };
 
   // Compute product statistics (outside of tabs)
   useEffect(() => {
@@ -332,7 +385,29 @@ const ProductDetails = () => {
       }`}>
         <div className="p-4 lg:p-6 max-w-7xl mx-auto">
           {/* Breadcrumb Navigation */}
-          <Breadcrumb customItems={breadcrumbItems} />
+          <div className="flex items-center justify-between gap-3">
+            <Breadcrumb customItems={breadcrumbItems} />
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={goPrev}
+                disabled={currentIndex <= 0}
+                iconName="ChevronLeft"
+                iconSize={18}
+                aria-label="Previous product"
+              />
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={goNext}
+                disabled={currentIndex < 0 || currentIndex >= allProducts.length - 1}
+                iconName="ChevronRight"
+                iconSize={18}
+                aria-label="Next product"
+              />
+            </div>
+          </div>
 
           {/* Product Header */}
           <ProductHeader

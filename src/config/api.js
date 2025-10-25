@@ -98,6 +98,10 @@ export const API_ENDPOINTS = {
   // Returns
   RETURN_AND_REPLACEMENTS: `${API_BASE_URL}/return-and-replacements`,
 
+  // Statuses
+  STATUSES: `${API_BASE_URL}/status`,
+  STATUSES_BY_REFERENCE: (ref) => `${API_BASE_URL}/status/reference/${ref}`,
+
 };
 
 export default API_ENDPOINTS;

@@ -25,6 +25,16 @@ const ProcessReturn = () => {
   const [success, setSuccess] = useState('');
   const toast = useToast();
 
+  // History state
+  const [history, setHistory] = useState([]);
+  const [statusMap, setStatusMap] = useState({}); // code -> description
+  const [histStatus, setHistStatus] = useState(''); // '', PEND, APPR, POST
+  const [histQuery, setHistQuery] = useState(''); // return_id or sale_detail_id
+  const [histStart, setHistStart] = useState(''); // yyyy-mm-dd
+  const [histEnd, setHistEnd] = useState('');
+  const [histPage, setHistPage] = useState(1);
+  const pageSize = 10;
+
   // Load sales and products lists
   useEffect(() => {
     const load = async () => {
@@ -37,6 +47,49 @@ const ProcessReturn = () => {
         const pRes = await fetch(API_ENDPOINTS.PRODUCTS);
         const pData = pRes.ok ? await pRes.json() : [];
         setProducts(pData);
+      } catch {}
+      try {
+        // Load RETURN and SLRTSTAT (Sales Return Status) references
+        const [resReturn, resSlrt] = await Promise.all([
+          fetch(API_ENDPOINTS.STATUSES_BY_REFERENCE('RETURN')),
+          fetch(API_ENDPOINTS.STATUSES_BY_REFERENCE('SLRTSTAT'))
+        ]);
+        const dataReturn = resReturn.ok ? await resReturn.json() : [];
+        const dataSlrt = resSlrt.ok ? await resSlrt.json() : [];
+        const map = {};
+        for (const s of [...dataReturn, ...dataSlrt]) { map[String(s.status_code)] = s.description || s.status_code; }
+        setStatusMap(map);
+      } catch {}
+      try {
+        const rRes = await fetch(API_ENDPOINTS.RETURN_AND_REPLACEMENTS);
+        const rData = rRes.ok ? await rRes.json() : [];
+        const rows = Array.isArray(rData) ? rData : [];
+        setHistory(rows);
+        // Resolve any unknown status codes by querying /status/:id
+        const unknown = new Set();
+        for (const r of rows) {
+          const code = String(r.return_status);
+          if (!code) continue;
+          if (!statusMap[code]) unknown.add(code);
+        }
+        if (unknown.size > 0) {
+          const entries = Array.from(unknown);
+          const fetched = await Promise.all(entries.map(async (code) => {
+            try {
+              const res = await fetch(`${API_ENDPOINTS.STATUSES}/${code}`);
+              if (res.ok) {
+                const s = await res.json();
+                return [code, s?.description || code];
+              }
+            } catch {}
+            return [code, code];
+          }));
+          setStatusMap(prev => {
+            const next = { ...prev };
+            for (const [code, desc] of fetched) next[String(code)] = desc;
+            return next;
+          });
+        }
       } catch {}
     };
     load();
@@ -104,7 +157,7 @@ const ProcessReturn = () => {
         const body = {
           sale_detail_id: l.sale_detail_id,
           quantity: qty,
-          return_status: 'PEND',
+          return_status: '2001',
           transaction_date: new Date().toISOString(),
           remarks: `Sale #${selectedSale.sale_id} • ${reason}`,
         };
@@ -136,10 +189,74 @@ const ProcessReturn = () => {
       }
       setSuccess('Return processed successfully.');
       try { toast?.success && toast.success('Return posted successfully'); } catch {}
+      // Refresh history after successful submission
+      try {
+        const rRes = await fetch(API_ENDPOINTS.RETURN_AND_REPLACEMENTS);
+        const rData = rRes.ok ? await rRes.json() : [];
+        const rows = Array.isArray(rData) ? rData : [];
+        setHistory(rows);
+        setHistPage(1);
+        // Resolve any unknown status codes
+        const unknown = new Set();
+        for (const r of rows) {
+          const code = String(r.return_status || '');
+          if (!code) continue;
+          if (!statusMap[code]) unknown.add(code);
+        }
+        if (unknown.size > 0) {
+          const entries = Array.from(unknown);
+          const fetched = await Promise.all(entries.map(async (code) => {
+            try {
+              const res = await fetch(`${API_ENDPOINTS.STATUSES}/${code}`);
+              if (res.ok) { const s = await res.json(); return [code, s?.description || '']; }
+            } catch {}
+            return [code, ''];
+          }));
+          setStatusMap(prev => {
+            const next = { ...prev };
+            for (const [code, desc] of fetched) next[String(code)] = desc;
+            return next;
+          });
+        }
+      } catch {}
     } catch (e1) {
       setError(e1?.message || 'Failed to process return');
     } finally { setSubmitting(false); }
   };
+
+  // Derived: filter + paginate history
+  const filteredHistory = useMemo(() => {
+    let rows = history;
+    if (histStatus) rows = rows.filter(r => String(r.return_status) === histStatus);
+    if (histQuery) {
+      const q = histQuery.toLowerCase();
+      rows = rows.filter(r => String(r.return_id||'').includes(q) || String(r.sale_detail_id||'').includes(q));
+    }
+    if (histStart) {
+      const s = new Date(histStart);
+      rows = rows.filter(r => r.transaction_date && new Date(r.transaction_date) >= s);
+    }
+    if (histEnd) {
+      const e = new Date(histEnd);
+      // include end day
+      e.setHours(23,59,59,999);
+      rows = rows.filter(r => r.transaction_date && new Date(r.transaction_date) <= e);
+    }
+    return rows.sort((a,b)=> new Date(b.transaction_date||0)-new Date(a.transaction_date||0));
+  }, [history, histStatus, histQuery, histStart, histEnd]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredHistory.length / pageSize));
+  const pagedHistory = useMemo(() => {
+    const start = (histPage - 1) * pageSize;
+    return filteredHistory.slice(start, start + pageSize);
+  }, [filteredHistory, histPage]);
+
+  // Build dynamic status options from history + status map
+  const historyStatusOptions = useMemo(() => {
+    const codes = Array.from(new Set((history || []).map(r => String(r.return_status)).filter(Boolean)));
+    const opts = codes.map(code => ({ value: code, label: statusMap[String(code)] || 'Unknown' }));
+    return [{ value: '', label: 'All' }, ...opts];
+  }, [history, statusMap]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -151,7 +268,7 @@ const ProcessReturn = () => {
           <h1 className="font-heading font-bold text-2xl mb-2">Process Return</h1>
           <p className="font-body text-muted-foreground mb-6">Handle customer returns and replacements.</p>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
             <div className="lg:col-span-2 space-y-6">
               <div className="bg-card border border-border rounded-lg p-4">
                 <h3 className="font-heading font-semibold text-lg mb-3 flex items-center gap-2"><Icon name="Search" size={18}/>Find Sale</h3>
@@ -231,17 +348,71 @@ const ProcessReturn = () => {
 
             <div className="space-y-4">
               <div className="bg-card border border-border rounded-lg p-4">
-                <h4 className="font-heading font-semibold text-sm mb-2">Summary</h4>
-                <div className="text-sm text-muted-foreground">Total items to return: <span className="font-medium text-foreground">{totalReturnQty}</span></div>
-                <div className="text-xs text-muted-foreground mt-2">Submission will require backend returns endpoint and DB table (return_and_replacement) to be available.</div>
-              </div>
-              <div className="bg-card border border-border rounded-lg p-4">
-                <h4 className="font-heading font-semibold text-sm mb-2">Tips</h4>
-                <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
-                  <li>Select the original sale to validate quantities.</li>
-                  <li>Refund reduces revenue; Replacement adds stock back for returned item and removes stock for replacement.</li>
-                  <li>Document the reason for audit.</li>
-                </ul>
+                <h4 className="font-heading font-semibold text-sm mb-3">Return / Refund History</h4>
+                <div className="grid grid-cols-1 gap-3">
+                  <div className="flex flex-col gap-3">
+                    <div className="flex gap-2 items-end flex-wrap">
+                      <Select
+                        label="Status"
+                        value={histStatus}
+                        onChange={setHistStatus}
+                        options={[
+                          { value: '', label: 'All' },
+                          { value: 'PEND', label: 'Pending' },
+                          { value: 'APPR', label: 'Approved' },
+                          { value: 'POST', label: 'Posted' },
+                        ]}
+                        className="w-36"
+                      />
+                      <Input label="Start" type="date" value={histStart} onChange={(e)=>{ setHistStart(e.target.value); setHistPage(1); }} />
+                      <Input label="End" type="date" value={histEnd} onChange={(e)=>{ setHistEnd(e.target.value); setHistPage(1); }} />
+                      <Input label="Search (ID or Sale Detail)" value={histQuery} onChange={(e)=>{ setHistQuery(e.target.value); setHistPage(1); }} className="min-w-[180px]" />
+                      <Button variant="ghost" onClick={()=>{ setHistStatus(''); setHistStart(''); setHistEnd(''); setHistQuery(''); setHistPage(1); }}>Clear</Button>
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted">
+                        <tr>
+                          <th className="text-left px-3 py-2">Return ID</th>
+                          <th className="text-left px-3 py-2">Date</th>
+                          <th className="text-left px-3 py-2">Status</th>
+                          <th className="text-left px-3 py-2">Sale Detail ID</th>
+                          <th className="text-left px-3 py-2">Qty</th>
+                          <th className="text-left px-3 py-2">Replacement Product</th>
+                          <th className="text-left px-3 py-2">Remarks</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {pagedHistory.length === 0 && (
+                          <tr>
+                            <td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">No history found.</td>
+                          </tr>
+                        )}
+                        {pagedHistory.map(r => (
+                          <tr key={r.return_id} className="hover:bg-muted/40">
+                            <td className="px-3 py-2 font-data">{r.return_id}</td>
+                            <td className="px-3 py-2">{r.transaction_date ? new Date(r.transaction_date).toLocaleString() : ''}</td>
+                            <td className="px-3 py-2">
+                              <span className="inline-flex px-2 py-0.5 rounded-full bg-secondary/10 text-secondary text-xs font-medium">{statusMap[String(r.return_status)] || 'Unknown'}</span>
+                            </td>
+                            <td className="px-3 py-2">{r.sale_detail_id}</td>
+                            <td className="px-3 py-2">{r.quantity}</td>
+                            <td className="px-3 py-2">{r.replacement_product_id || '-'}</td>
+                            <td className="px-3 py-2 truncate max-w-[220px]" title={r.remarks || ''}>{r.remarks || ''}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <div className="text-xs text-muted-foreground">Page {histPage} of {totalPages}</div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={()=> setHistPage(p=> Math.max(1, p-1))} disabled={histPage<=1}>Previous</Button>
+                      <Button variant="outline" size="sm" onClick={()=> setHistPage(p=> Math.min(totalPages, p+1))} disabled={histPage>=totalPages}>Next</Button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
