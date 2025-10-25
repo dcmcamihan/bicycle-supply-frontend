@@ -7,6 +7,7 @@ import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
 import Icon from '../../components/AppIcon';
 import API_ENDPOINTS from '../../config/api';
+import { useToast } from '../../components/ui/Toast';
 
 const ProcessReturn = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -22,6 +23,7 @@ const ProcessReturn = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const toast = useToast();
 
   // Load sales and products lists
   useEffect(() => {
@@ -92,62 +94,48 @@ const ProcessReturn = () => {
     const anyReturn = returnLines.some(l => Number(l.qtyReturn)>0);
     if (!anyReturn) { setError('Set at least one return quantity.'); return; }
     if (!reason.trim()) { setError('Provide a reason for the return.'); return; }
-
-    // Create return_and_replacement records first (one per line), then build stock adjustment
-    const details = [];
-    // positive adjustments for each returned item
-    for (const l of returnLines) {
-      const qty = Number(l.qtyReturn) || 0;
-      if (qty > 0) details.push({ product_id: l.product_id, quantity: qty });
-    }
-    // negative adjustment for replacement product (sum of returned qty)
-    if (actionType === 'replacement') {
-      const totalReplace = details.reduce((s, d) => s + (Number(d.quantity) || 0), 0);
-      if (!replacementProductId) { setError('Select a replacement product.'); return; }
-      if (totalReplace > 0) details.push({ product_id: Number(replacementProductId), quantity: -totalReplace });
-    }
-
-    // Create returns (best-effort; backend model expects per sale_detail row)
-    let linkedReturnId = null;
-    try {
-      const bodyRows = returnLines.filter(l => Number(l.qtyReturn)>0).map(l => ({
-        sale_detail_id: l.sale_detail_id,
-        return_status: 'PEND',
-        transaction_date: new Date().toISOString(),
-        remarks: reason || null,
-      }));
-      for (const row of bodyRows) {
-        try {
-          const rRes = await fetch(API_ENDPOINTS.RETURN_AND_REPLACEMENTS, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(row)
-          });
-          if (rRes.ok) {
-            const r = await rRes.json();
-            if (!linkedReturnId) linkedReturnId = r?.return_id || r?.id || null;
-          }
-        } catch {}
-      }
-    } catch {}
-
-    const payload = {
-      adjustment_type: actionType === 'replacement' ? 'replacement' : 'return',
-      transaction_date: new Date().toISOString(),
-      remarks: `Sale #${selectedSale.sale_id} • ${reason}`,
-      processed_by: null,
-      return_id: linkedReturnId || null,
-      details,
-    };
-
     try {
       setSubmitting(true);
-      const res = await fetch(API_ENDPOINTS.STOCK_ADJUSTMENTS, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.message || data?.error || 'Failed to create stock adjustment');
+      // Create return rows (PENDING) with quantity and optional replacement product
+      const createdReturnIds = [];
+      for (const l of returnLines) {
+        const qty = Number(l.qtyReturn) || 0;
+        if (qty <= 0) continue;
+        const body = {
+          sale_detail_id: l.sale_detail_id,
+          quantity: qty,
+          return_status: 'PEND',
+          transaction_date: new Date().toISOString(),
+          remarks: `Sale #${selectedSale.sale_id} • ${reason}`,
+        };
+        if (actionType === 'replacement' && replacementProductId) {
+          body.replacement_product_id = Number(replacementProductId);
+        }
+        const rRes = await fetch(API_ENDPOINTS.RETURN_AND_REPLACEMENTS, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+        });
+        const rData = await rRes.json().catch(()=>({}));
+        if (!rRes.ok) throw new Error(rData?.message || rData?.error || 'Failed to create return');
+        const rid = rData?.return_id || rData?.id;
+        if (rid) createdReturnIds.push(rid);
+      }
+
+      // Approve and post each return row (creates stock adjustments server-side)
+      const genId = () => {
+        try { return (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`; } catch { return `${Date.now()}-${Math.random().toString(16).slice(2)}`; }
+      };
+      for (const rid of createdReturnIds) {
+        const appr = await fetch(`${API_ENDPOINTS.RETURN_AND_REPLACEMENTS}/${rid}/approve`, { method: 'POST' });
+        if (!appr.ok) {
+          const t = await appr.text(); throw new Error(t || `Failed to approve return ${rid}`);
+        }
+        const post = await fetch(`${API_ENDPOINTS.RETURN_AND_REPLACEMENTS}/${rid}/post`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client_request_id: genId() }) });
+        if (!post.ok) {
+          const t = await post.text(); throw new Error(t || `Failed to post return ${rid}`);
+        }
+      }
       setSuccess('Return processed successfully.');
+      try { toast?.success && toast.success('Return posted successfully'); } catch {}
     } catch (e1) {
       setError(e1?.message || 'Failed to process return');
     } finally { setSubmitting(false); }

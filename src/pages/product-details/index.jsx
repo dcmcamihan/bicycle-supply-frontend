@@ -441,7 +441,6 @@ const ProductDetails = () => {
               }
             } catch {}
             setRefreshCounter((c) => c + 1);
-            setShowAdjust(false);
           }}
         />
       )}

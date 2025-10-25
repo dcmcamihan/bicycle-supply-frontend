@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import Icon from '../AppIcon';
 import Button from './Button';
+import API_ENDPOINTS from '../../config/api';
 
 const Sidebar = ({ isCollapsed = false, onToggle }) => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const location = useLocation();
+  const [pendingCount, setPendingCount] = useState(0);
 
   const navigationItems = [
     {
@@ -34,6 +36,12 @@ const Sidebar = ({ isCollapsed = false, onToggle }) => {
       ]
     },
     {
+      label: 'Orders',
+      path: '/orders/pending',
+      icon: 'ClipboardList',
+      description: 'Manage pending orders'
+    },
+    {
       label: 'Reports',
       path: '/sales-reports',
       icon: 'BarChart3',
@@ -57,6 +65,24 @@ const Sidebar = ({ isCollapsed = false, onToggle }) => {
   useEffect(() => {
     setIsMobileOpen(false);
   }, [location?.pathname]);
+
+  // Fetch pending orders count periodically
+  useEffect(() => {
+    let timer;
+    const load = async () => {
+      try {
+        const res = await fetch(`${API_ENDPOINTS.SALES}?status=Pending`);
+        if (res.ok) {
+          const data = await res.json();
+          const count = Array.isArray(data) ? data.length : (typeof data?.total === 'number' ? data.total : (Array.isArray(data?.data) ? data.data.length : 0));
+          setPendingCount(count || 0);
+        }
+      } catch {}
+      timer = setTimeout(load, 30000);
+    };
+    load();
+    return () => { if (timer) clearTimeout(timer); };
+  }, []);
 
   // Close mobile menu on escape key
   useEffect(() => {
@@ -123,6 +149,14 @@ const Sidebar = ({ isCollapsed = false, onToggle }) => {
                   {item?.description && (
                     <div className="text-xs opacity-75 truncate">{item?.description}</div>
                   )}
+                </div>
+              )}
+              {/* Pending badge for Orders */}
+              {!isCollapsed && item?.path === '/orders/pending' && (
+                <div className="ml-auto">
+                  <span className="inline-flex items-center justify-center min-w-[22px] h-5 px-2 text-xs rounded-full bg-accent text-accent-foreground border border-border">
+                    {pendingCount}
+                  </span>
                 </div>
               )}
             </Link>

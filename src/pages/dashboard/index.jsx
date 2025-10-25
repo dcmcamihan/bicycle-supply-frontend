@@ -64,21 +64,9 @@ const Dashboard = () => {
         const endToday = new Date(today); endToday.setHours(23,59,59,999);
 
         let todayTotal = 0;
-        let pending = 0;
         for (const s of sales) {
           const saleId = s.sale_id || s.id;
           const d = new Date(s.sale_date || s.date || s.created_at);
-          try {
-            const payRes = await fetch(API_ENDPOINTS.SALE_PAYMENT_TYPES_BY_SALE(saleId));
-            if (!payRes.ok) {
-              pending += 1;
-            } else {
-              const pays = await payRes.json();
-              if (!Array.isArray(pays) || pays.length === 0) pending += 1;
-            }
-          } catch {
-            pending += 1;
-          }
 
           if (!isNaN(d) && d >= startToday && d <= endToday) {
             let sum = 0;
@@ -98,7 +86,18 @@ const Dashboard = () => {
           }
         }
         setTodaySales(todayTotal);
-        setPendingOrders(pending);
+
+        // Fetch pending orders by status
+        try {
+          const pendRes = await fetch(`${API_ENDPOINTS.SALES}?status=Pending`);
+          if (pendRes.ok) {
+            const pend = await pendRes.json();
+            const count = Array.isArray(pend) ? pend.length : (typeof pend?.total === 'number' ? pend.total : (Array.isArray(pend?.data) ? pend.data.length : 0));
+            setPendingOrders(count);
+          } else {
+            setPendingOrders(0);
+          }
+        } catch { setPendingOrders(0); }
       } catch {
         setTodaySales(0);
         setTotalInventory(0);

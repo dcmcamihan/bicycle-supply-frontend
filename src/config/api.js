@@ -89,6 +89,13 @@ export const API_ENDPOINTS = {
   STOCKOUT: (id) => `${API_BASE_URL}/stockouts/${id}`,
   STOCKOUT_DETAILS: `${API_BASE_URL}/stockout-details`, // GET all, POST new
   STOCKOUT_DETAILS_BY_STOCKOUT: (stockoutId) => `${API_BASE_URL}/stockout-details/stockout/${stockoutId}`,
-}; 
+
+  // Stock Adjustments (manual/return/replacement)
+  STOCK_ADJUSTMENTS: `${API_BASE_URL}/stock-adjustments`,
+
+  // Returns
+  RETURN_AND_REPLACEMENTS: `${API_BASE_URL}/return-and-replacements`,
+
+};
 
 export default API_ENDPOINTS;

@@ -3,14 +3,17 @@ import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
 import API_ENDPOINTS from '../../../config/api';
+import { useToast } from '../../../components/ui/Toast';
 
 const AdjustStockModal = ({ isOpen, onClose, productId, currentQoh = 0, onAdjusted }) => {
+  const toast = useToast();
   const [delta, setDelta] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [historyLoading, setHistoryLoading] = useState(false);
   const [history, setHistory] = useState([]); // {date, type, quantity, ref, notes}
   const [historyEdits, setHistoryEdits] = useState([]); // editable quantities per row
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
   const [page, setPage] = useState(1);
   const pageSize = 5; // fixed rows per page
 
@@ -111,10 +114,12 @@ const AdjustStockModal = ({ isOpen, onClose, productId, currentQoh = 0, onAdjust
       } catch {}
       try {
         // Stock Adjustments -> +/- qty from details
-        const adjRes = await fetch(API_ENDPOINTS.STOCK_ADJUSTMENTS);
+        const qs = new URLSearchParams({ page: '1', pageSize: '200', product_id: String(productId) });
+        const adjRes = await fetch(`${API_ENDPOINTS.STOCK_ADJUSTMENTS}?${qs.toString()}`);
         if (adjRes.ok) {
-          const adjs = await adjRes.json();
-          for (const a of (adjs || [])) {
+          const resp = await adjRes.json();
+          const adjs = Array.isArray(resp) ? resp : (resp?.data || []);
+          for (const a of adjs) {
             const details = a.details || [];
             for (const d of details) {
               if (Number(d.product_id) === Number(productId)) {
@@ -131,7 +136,7 @@ const AdjustStockModal = ({ isOpen, onClose, productId, currentQoh = 0, onAdjust
       setHistoryLoading(false);
     };
     if (isOpen && productId) loadHistory();
-  }, [isOpen, productId]);
+  }, [isOpen, productId, historyRefreshKey]);
 
   const totalPages = Math.max(1, Math.ceil(history.length / pageSize));
   const startIdx = (page - 1) * pageSize;
@@ -143,12 +148,44 @@ const AdjustStockModal = ({ isOpen, onClose, productId, currentQoh = 0, onAdjust
     setError('');
     // Compute total delta from edits vs original quantities
     const totalDelta = historyEdits.reduce((sum, v, i) => sum + ((Number(v)||0) - (Number(history[i]?.quantity)||0)), 0);
+    if (!totalDelta || Number.isNaN(totalDelta) || totalDelta === 0) {
+      setError('No changes detected. Adjust one or more rows to proceed.');
+      return;
+    }
     setLoading(true);
-    setTimeout(() => {
-      if (onAdjusted) onAdjusted(totalDelta);
+    try {
+      const genId = () => {
+        try { return (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`; } catch { return `${Date.now()}-${Math.random().toString(16).slice(2)}`; }
+      };
+      const payload = {
+        client_request_id: genId(),
+        adjustment_type: 'manual',
+        transaction_date: new Date().toISOString(),
+        remarks: 'Manual adjustment via Product Details',
+        processed_by: null,
+        details: [{ product_id: Number(productId), quantity: Number(totalDelta) }]
+      };
+      const res = await fetch(API_ENDPOINTS.STOCK_ADJUSTMENTS, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        const txt = await res.text().catch(()=> '');
+        let msg = 'Failed to save stock adjustment';
+        try { const j = JSON.parse(txt || '{}'); msg = j.message || j.error || msg; } catch { if (txt) msg = txt; }
+        throw new Error(msg);
+      }
+      const data = await res.json().catch(()=>({}));
+      if (onAdjusted) onAdjusted(Number(totalDelta));
+      // Reload history and keep modal open so user sees the change immediately
+      setHistoryRefreshKey(k => k + 1);
+      try { toast?.success && toast.success('Stock adjusted successfully'); } catch {}
+    } catch (e) {
+      setError(e?.message || 'Failed to apply stock adjustment');
+    } finally {
       setLoading(false);
-      onClose();
-    }, 400);
+    }
   };
 
   return (
