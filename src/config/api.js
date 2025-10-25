@@ -5,6 +5,8 @@ export const API_ENDPOINTS = {
   // Products
   PRODUCTS: `${API_BASE_URL}/products`, // GET all, POST new
   PRODUCT: (productId) => `${API_BASE_URL}/products/${productId}`,
+  PRODUCT_ARCHIVE: (productId) => `${API_BASE_URL}/products/${productId}/archive`,
+  PRODUCT_ACTIVATE: (productId) => `${API_BASE_URL}/products/${productId}/activate`,
 
   // Product Images
   PRODUCT_IMAGES: `${API_BASE_URL}/product-images`, // GET all, POST new

@@ -519,25 +519,25 @@ const InventoryManagement = () => {
   
 
   const handleDeleteProduct = async (product) => {
-    const confirmed = window.confirm(`Are you sure you want to delete "${product?.name}"?`);
+    const confirmed = window.confirm(`Archive "${product?.name}"? It will be hidden from lists and calculations, but not deleted.`);
     if (!confirmed) return;
     try {
-      const res = await fetch(API_ENDPOINTS.PRODUCT(product.id), { method: 'DELETE' });
-      if (!res.ok && res.status !== 204) {
+      const res = await fetch(API_ENDPOINTS.PRODUCT_ARCHIVE(product.id), { method: 'PUT' });
+      if (!res.ok) {
         const errText = await res.text();
-        throw new Error(errText || 'Failed to delete product');
+        throw new Error(errText || 'Failed to archive product');
       }
       // Refresh list
       const response = await fetch(API_ENDPOINTS.PRODUCTS);
       const data = await response.json();
       setRawProducts(data);
-      try { toast?.success && toast.success('Product deleted'); } catch {}
+      try { toast?.success && toast.success('Product archived'); } catch {}
     } catch (error) {
       console.error('Failed to delete product:', error);
       const raw = String(error?.message || '');
       const friendly = raw.toLowerCase().includes('foreign key') || raw.includes('Cannot delete or update a parent row')
-        ? 'Cannot delete: this product has historical records (supplies/sales/returns). Please archive/disable it instead.'
-        : (error?.message || 'Failed to delete product');
+        ? 'Cannot delete: this product has historical records (supplies/sales/returns). It has not been deleted.'
+        : (error?.message || 'Failed to archive product');
       try { toast?.error && toast.error(friendly); } catch {}
       alert(friendly);
     }
