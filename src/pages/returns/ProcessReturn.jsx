@@ -394,7 +394,9 @@ const ProcessReturn = () => {
                             <td className="px-3 py-2 font-data">{r.return_id}</td>
                             <td className="px-3 py-2">{r.transaction_date ? new Date(r.transaction_date).toLocaleString() : ''}</td>
                             <td className="px-3 py-2">
-                              <span className="inline-flex px-2 py-0.5 rounded-full bg-secondary/10 text-secondary text-xs font-medium">{statusMap[String(r.return_status)] || 'Unknown'}</span>
+                              <span className="inline-flex px-2 py-0.5 rounded-full bg-secondary/10 text-secondary text-xs font-medium">
+                                {statusMap && statusMap[String(r.return_status)] ? statusMap[String(r.return_status)] : String(r.return_status) || 'Unknown'}
+                              </span>
                             </td>
                             <td className="px-3 py-2">{r.sale_detail_id}</td>
                             <td className="px-3 py-2">{r.quantity}</td>

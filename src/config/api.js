@@ -94,13 +94,15 @@ export const API_ENDPOINTS = {
 
   // Stock Adjustments (manual/return/replacement)
   STOCK_ADJUSTMENTS: `${API_BASE_URL}/stock-adjustments`,
+  // Stock Adjustment Details
+  STOCK_ADJUSTMENT_DETAILS: `${API_BASE_URL}/stock-adjustment-details`,
 
   // Returns
   RETURN_AND_REPLACEMENTS: `${API_BASE_URL}/return-and-replacements`,
 
   // Statuses
   STATUSES: `${API_BASE_URL}/status`,
-  STATUSES_BY_REFERENCE: (ref) => `${API_BASE_URL}/status/reference/${ref}`,
+  STATUSES_BY_REFERENCE: (ref) => `${API_BASE_URL}/statuses/reference/${ref}`,
 
 };
 
