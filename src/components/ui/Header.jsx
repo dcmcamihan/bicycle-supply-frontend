@@ -24,33 +24,119 @@ const Header = ({ onSidebarToggle, user = null }) => {
     let mounted = true;
     const load = async () => {
       try {
-        const [salesRes, stockoutRes] = await Promise.all([
+        // Get the timestamp from 24 hours ago for recent activities
+        const twentyFourHoursAgo = new Date();
+        twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
+
+        // fetch sales, stockouts and stock adjustments to show recent activity
+        const [salesRes, stockoutRes, adjustmentsRes] = await Promise.all([
           fetch(API_ENDPOINTS.SALES),
-          fetch(API_ENDPOINTS.STOCKOUTS)
+          fetch(API_ENDPOINTS.STOCKOUTS),
+          fetch(API_ENDPOINTS.STOCK_ADJUSTMENTS)
         ]);
-        const sales = salesRes.ok ? await salesRes.json() : [];
-        const stockouts = stockoutRes.ok ? await stockoutRes.json() : [];
-        const saleItems = (sales||[]).slice(-5).map(s => ({
-          id: `sale-${s.sale_id}`,
-          icon: 'Receipt',
-          title: `Sale #${s.sale_id}`,
-          subtitle: new Date(s.sale_date).toLocaleString(),
+
+        if (!salesRes.ok || !stockoutRes.ok || !adjustmentsRes.ok) {
+          throw new Error('Failed to fetch notifications');
+        }
+
+        const sales = await salesRes.json();
+        const stockouts = await stockoutRes.json();
+        const adjustmentsResponse = await adjustmentsRes.json();
+        // Handle the paginated response structure for adjustments
+        const adjustments = adjustmentsResponse.data || [];
+
+        const saleItems = sales
+          .filter(s => s.sale_date && new Date(s.sale_date) > twentyFourHoursAgo)
+          .map(s => ({
+            id: `sale-${s.sale_id}`,
+            type: 'sale',
+            date: new Date(s.sale_date),
+            icon: 'Receipt',
+            title: `Sale #${s.sale_id}`,
+            subtitle: s.status === 'Pending' ? 'Pending approval' : 'Sale completed',
+            payload: { saleId: s.sale_id }
+          }));
+
+        const stockoutItems = stockouts
+          .filter(st => st.stockout_date && new Date(st.stockout_date) > twentyFourHoursAgo)
+          .map(st => ({
+            id: `stockout-${st.stockout_id}`,
+            type: 'stockout',
+            date: new Date(st.stockout_date),
+            icon: 'PackageMinus',
+            title: `Stockout #${st.stockout_id}`,
+            subtitle: st.remarks || `Reason: ${st.reason || 'Inventory adjustment'}`,
+            payload: { stockoutId: st.stockout_id }
+          }));
+
+        const adjustItems = adjustments
+          .filter(a => {
+            const date = a.transaction_date ? new Date(a.transaction_date) : null;
+            return date && date > twentyFourHoursAgo;
+          })
+          .map(a => {
+            // Get the first detail if available
+            const detail = a.details?.[0];
+            return {
+              id: `adj-${a.adjustment_id}`,
+              type: 'adjustment',
+              date: new Date(a.transaction_date),
+              icon: 'Activity',
+              title: a.remarks || `Stock Adjustment #${a.adjustment_id}`,
+              subtitle: detail ? 
+                `${detail.quantity > 0 ? '+' : ''}${detail.quantity} units (Product ${detail.product_id})` : 
+                'Stock level adjusted',
+              payload: { adjustment: a }
+            };
+          });
+
+        // combine and sort by most recent
+        const combined = [...saleItems, ...stockoutItems, ...adjustItems]
+          .filter(i => i.date)
+          .sort((a, b) => b.date - a.date);
+
+        // keep top 10
+        const top = combined.slice(0, 10).map(i => ({
+          id: i.id,
+          icon: i.icon,
+          title: i.title,
+          subtitle: i.subtitle,
+          date: i.date,
+          type: i.type,
+          payload: i.payload,
+          timeAgo: timeAgo(i.date)
         }));
-        const stockoutItems = (stockouts||[]).slice(-5).map(st => ({
-          id: `stockout-${st.stockout_id}`,
-          icon: 'PackageMinus',
-          title: `Stockout #${st.stockout_id}`,
-          subtitle: new Date(st.stockout_date).toLocaleString(),
-        }));
-        if (mounted) setNotifications([...stockoutItems, ...saleItems].slice(-8).reverse());
-      } catch {
-        // ignore
+
+        if (mounted) setNotifications(top);
+      } catch (error) {
+        console.error('Failed to load notifications:', error);
       }
     };
+
+    // Initial load
     load();
-    const t = setInterval(load, 60000);
-    return () => { mounted = false; clearInterval(t); };
+
+    // Refresh every 30 seconds instead of 60
+    const t = setInterval(load, 30000);
+    
+    return () => { 
+      mounted = false; 
+      clearInterval(t); 
+    };
   }, []);
+
+  const timeAgo = (date) => {
+    if (!date) return '';
+    const ms = Date.now() - date.getTime();
+    const sec = Math.floor(ms/1000);
+    if (sec < 60) return `${sec}s ago`;
+    const min = Math.floor(sec/60);
+    if (min < 60) return `${min}m ago`;
+    const hr = Math.floor(min/60);
+    if (hr < 24) return `${hr}h ago`;
+    const d = Math.floor(hr/24);
+    return `${d}d ago`;
+  };
 
   const handleLogout = () => {
     logout();
@@ -136,8 +222,12 @@ const Header = ({ onSidebarToggle, user = null }) => {
               iconSize={20}
               onClick={() => setIsNotificationsOpen(v => !v)}
             >
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-accent rounded-full"></span>
-              <span className="sr-only">Notifications</span>
+              {notifications.length > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-accent rounded-full flex items-center justify-center">
+                  <span className="text-[10px] font-medium text-white">{notifications.length}</span>
+                </span>
+              )}
+              <span className="sr-only">Notifications ({notifications.length})</span>
             </Button>
             {isNotificationsOpen && (
               <>
@@ -145,23 +235,43 @@ const Header = ({ onSidebarToggle, user = null }) => {
                 <div className="absolute right-0 top-full mt-2 w-80 bg-popover border border-border rounded-lg shadow-raised z-1200 backdrop-glass">
                   <div className="p-3 border-b border-border flex items-center justify-between">
                     <p className="font-body text-sm font-semibold">Notifications</p>
-                    <span className="font-caption text-xs text-muted-foreground">{notifications.length}</span>
+                    <span className="font-caption text-xs text-muted-foreground">{notifications.length || 'No'} recent {notifications.length === 1 ? 'activity' : 'activities'}</span>
                   </div>
                   <div className="max-h-80 overflow-auto divide-y divide-border">
-                    {notifications.length === 0 ? (
-                      <div className="p-4 text-sm text-muted-foreground">No recent activity</div>
-                    ) : notifications.map(n => (
-                      <div key={n.id} className="p-3 flex items-start space-x-3 hover:bg-muted/50">
-                        <div className="w-8 h-8 rounded-md bg-secondary flex items-center justify-center flex-shrink-0">
-                          <Icon name={n.icon} size={16} />
+                      {notifications.length === 0 ? (
+                        <div className="p-4 text-center text-sm text-muted-foreground">
+                          <Icon name="Bell" size={24} className="mx-auto mb-2 text-muted-foreground/50" />
+                          No recent activity
                         </div>
-                        <div className="min-w-0">
-                          <p className="font-body text-sm text-popover-foreground truncate">{n.title}</p>
-                          <p className="font-caption text-xs text-muted-foreground truncate">{n.subtitle}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                      ) : notifications.map(n => (
+                        <button 
+                          key={n.id} 
+                          onClick={() => {
+                            setIsNotificationsOpen(false);
+                            // navigate depending on type
+                            if (n.type === 'sale') navigate('/dashboard');
+                            else if (n.type === 'stockout' || n.type === 'adjustment') navigate('/inventory-management');
+                            else navigate('/dashboard');
+                          }} 
+                          className="w-full text-left p-3 flex items-start space-x-3 hover:bg-muted/50 transition-colors"
+                        >
+                          <div className={`w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 ${
+                            n.type === 'sale' ? 'bg-success/10 text-success' :
+                            n.type === 'stockout' ? 'bg-destructive/10 text-destructive' :
+                            'bg-warning/10 text-warning'
+                          }`}>
+                            <Icon name={n.icon} size={16} />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="font-body text-sm text-popover-foreground truncate">{n.title}</p>
+                              <p className="font-caption text-xs text-muted-foreground">{timeAgo(n.date)}</p>
+                            </div>
+                            <p className="font-caption text-xs text-muted-foreground truncate">{n.subtitle}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
                 </div>
               </>
             )}

@@ -191,6 +191,22 @@ const ProductDetails = () => {
   const goPrev = () => { if (currentIndex > 0) goToProductByIndex(currentIndex - 1); };
   const goNext = () => { if (currentIndex >= 0 && currentIndex < allProducts.length - 1) goToProductByIndex(currentIndex + 1); };
 
+  // Keyboard navigation (left/right arrows) for product browsing
+  useEffect(() => {
+    const onKey = (e) => {
+      const tag = document.activeElement?.tagName?.toLowerCase();
+      // don't interfere when typing into inputs or textareas
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      if (e.key === 'ArrowLeft') {
+        goPrev();
+      } else if (e.key === 'ArrowRight') {
+        goNext();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [currentIndex, allProducts]);
+
   // Compute product statistics (outside of tabs)
   useEffect(() => {
     const loadStats = async () => {
