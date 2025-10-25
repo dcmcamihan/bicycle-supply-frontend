@@ -13,6 +13,7 @@ import ProductModal from './components/ProductModal';
 import MobileInventoryCard from './components/MobileInventoryCard';
 import API_ENDPOINTS from '../../config/api';
 import CreatePurchaseOrderModal from '../product-details/components/CreatePurchaseOrderModal';
+import { useToast } from '../../components/ui/Toast';
 
 const InventoryManagement = () => {
   // Brands state
@@ -65,6 +66,7 @@ const InventoryManagement = () => {
   const [showPOModal, setShowPOModal] = useState(false);
   const [poProductId, setPoProductId] = useState(null);
   const [poSupplierId, setPoSupplierId] = useState(null);
+  const toast = useToast();
 
   // Products state
   const [rawProducts, setRawProducts] = useState([]);
@@ -529,9 +531,15 @@ const InventoryManagement = () => {
       const response = await fetch(API_ENDPOINTS.PRODUCTS);
       const data = await response.json();
       setRawProducts(data);
+      try { toast?.success && toast.success('Product deleted'); } catch {}
     } catch (error) {
       console.error('Failed to delete product:', error);
-      alert('Failed to delete product');
+      const raw = String(error?.message || '');
+      const friendly = raw.toLowerCase().includes('foreign key') || raw.includes('Cannot delete or update a parent row')
+        ? 'Cannot delete: this product has historical records (supplies/sales/returns). Please archive/disable it instead.'
+        : (error?.message || 'Failed to delete product');
+      try { toast?.error && toast.error(friendly); } catch {}
+      alert(friendly);
     }
   };
 

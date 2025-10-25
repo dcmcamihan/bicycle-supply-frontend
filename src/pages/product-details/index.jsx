@@ -11,6 +11,7 @@ import AdjustStockModal from './components/AdjustStockModal';
 import ProductActions from './components/ProductActions';
 
 import Button from '../../components/ui/Button';
+import { useToast } from '../../components/ui/Toast';
 
 const ProductDetails = () => {
   const navigate = useNavigate();
@@ -22,6 +23,7 @@ const ProductDetails = () => {
   const [currentQoh, setCurrentQoh] = useState(0);
   const [refreshCounter, setRefreshCounter] = useState(0);
   const [stats, setStats] = useState({ totalSold: 0, revenue: 0, lastSold: null, daysInStock: null });
+  const toast = useToast();
 
   // Get id from URL query params
   const searchParams = new URLSearchParams(location.search);
@@ -268,10 +270,23 @@ const ProductDetails = () => {
 
   
 
-  const handleDeleteProduct = (productId) => {
-    console.log('Product deleted:', productId);
-    // In real app, this would make an API call and navigate back to inventory
-    navigate('/inventory-management');
+  const handleDeleteProduct = async (productId) => {
+    const pid = productId || product?.id;
+    if (!pid) return;
+    const confirmed = window.confirm('Delete this product permanently?');
+    if (!confirmed) return;
+    try {
+      const res = await fetch(API_ENDPOINTS.PRODUCT(pid), { method: 'DELETE' });
+      if (!res.ok && res.status !== 204) {
+        const txt = await res.text();
+        throw new Error(txt || 'Failed to delete product');
+      }
+      try { toast?.success && toast.success('Product deleted'); } catch {}
+      navigate('/inventory-management');
+    } catch (e) {
+      try { toast?.error && toast.error(e?.message || 'Failed to delete product'); } catch {}
+      alert(e?.message || 'Failed to delete product');
+    }
   };
 
   const handleAddToCart = (productToAdd) => {

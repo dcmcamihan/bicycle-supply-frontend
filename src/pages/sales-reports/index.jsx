@@ -599,30 +599,46 @@ const SalesReports = () => {
       const { start, end } = getDateRangeBounds(dateRange);
       const dateLabel = `${start.toISOString().split('T')[0]} to ${end.toISOString().split('T')[0]}`;
 
-      const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
       const pageWidth = doc.internal.pageSize.getWidth();
-      const margin = 40;
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 48;
       const usable = pageWidth - margin * 2;
+      const headerColor = [37, 99, 235];
       const commonTableOpts = {
         theme: 'grid',
-        styles: { fontSize: 9, cellPadding: 4, overflow: 'linebreak' },
-        headStyles: { fillColor: [37, 99, 235] },
+        styles: { fontSize: 10, cellPadding: 5, overflow: 'linebreak' },
+        headStyles: { fillColor: headerColor, textColor: 255, halign: 'center', fontSize: 11 },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
         margin: { left: margin, right: margin },
         tableWidth: usable,
-        columnStyles: {}
+        columnStyles: {},
+        didDrawPage: (data) => {
+          // Header
+          doc.setFontSize(16);
+          doc.setTextColor(17, 24, 39);
+          doc.text('Sales Summary Report', margin, 28);
+          doc.setFontSize(10);
+          doc.setTextColor(55, 65, 81);
+          doc.text(`Date Range: ${dateLabel}  •  Report Type: ${reportType}`, margin, 44);
+          // Divider
+          doc.setDrawColor(229, 231, 235);
+          doc.line(margin, 52, pageWidth - margin, 52);
+          // Footer page number
+          const str = `Page ${doc.internal.getNumberOfPages()}`;
+          doc.setFontSize(9);
+          doc.setTextColor(107, 114, 128);
+          doc.text(str, margin, pageHeight - 16);
+        }
       };
 
-      // Title
-      doc.setFontSize(18);
-      doc.text('Sales Summary Report', 40, 40);
-      doc.setFontSize(11);
-      doc.text(`Date Range: ${dateLabel}`, 40, 60);
-      doc.text(`Report Type: ${reportType}`, 40, 76);
+      // Initial top offset below header
+      let topY = 64;
 
       // Executive Summary (concise, peso-only values)
       const kpiMap = Object.fromEntries(kpiData.map(k => [k.title, k]));
       autoTable(doc, {
-        startY: 96,
+        startY: topY,
         head: [['Executive Summary', 'Value']],
         body: [
           ['Total Sales', `₱${Number(kpiMap['Total Sales']?.value||0).toLocaleString()}`],
@@ -630,7 +646,7 @@ const SalesReports = () => {
           ['Average Order', `₱${Number(kpiMap['Average Order']?.value||0).toLocaleString()}`]
         ],
         ...commonTableOpts,
-        styles: { ...commonTableOpts.styles, fontSize: 10 },
+        styles: { ...commonTableOpts.styles, fontSize: 11 },
         columnStyles: { 0: { cellWidth: 200 }, 1: { cellWidth: 240 } },
       });
 
