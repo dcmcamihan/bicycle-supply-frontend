@@ -5,7 +5,7 @@ import Button from '../../../components/ui/Button';
 
 const SalesChart = ({ data, title = "Sales Trends", timeframe: timeframeProp, onTimeframeChange }) => {
   const [chartType, setChartType] = useState('line');
-  const [localTimeframe, setLocalTimeframe] = useState('daily');
+  const [localTimeframe, setLocalTimeframe] = useState('hourly');
   const timeframe = timeframeProp ?? localTimeframe;
 
   const chartData = data || [

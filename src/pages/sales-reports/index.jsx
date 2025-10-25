@@ -121,7 +121,7 @@ const SalesReports = () => {
   const [dateRange, setDateRange] = useState('today');
   const [reportType, setReportType] = useState('daily');
   const [customRange, setCustomRange] = useState({ start: '', end: '' });
-  const [chartTimeframe, setChartTimeframe] = useState('daily');
+  const [chartTimeframe, setChartTimeframe] = useState('hourly');
   const [isLoading, setIsLoading] = useState(false);
   const [stockAdjustments, setStockAdjustments] = useState([]);
   const [stockMovements, setStockMovements] = useState([]);
