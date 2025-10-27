@@ -444,11 +444,29 @@ const SalesReports = () => {
           movements.push({ date: o.stockout_date, type: 'Stockout', remarks: o.reason || '', lines });
         }
       } catch {}
-      // Adjustments already loaded -> map into movements
+      // Adjustments -> fetch details per adjustment
       try {
         for (const a of stockAdjustments) {
-          const lines = (a.details || []).map(d => ({ product_id: d.product_id, quantity: Number(d.quantity)||0 }));
-          movements.push({ date: a.transaction_date, type: 'Adjustment', remarks: a.remarks || '', lines });
+          let lines = [];
+          try {
+            const detRes = await fetch(API_ENDPOINTS.STOCK_ADJUSTMENT_DETAILS);
+            if (detRes.ok) {
+              const allDetails = await detRes.json();
+              // Filter details for this adjustment
+              const adjDetails = (allDetails || []).filter(d => Number(d.adjustment_id) === Number(a.adjustment_id));
+              lines = adjDetails.map(d => ({ product_id: d.product_id, quantity: Number(d.quantity)||0 }));
+            }
+          } catch {}
+          
+          // Only add movement if it has lines
+          if (lines.length > 0) {
+            movements.push({ 
+              date: a.transaction_date, 
+              type: 'Adjustment', 
+              remarks: a.remarks || '', 
+              lines 
+            });
+          }
         }
       } catch {}
       // Sort desc by date

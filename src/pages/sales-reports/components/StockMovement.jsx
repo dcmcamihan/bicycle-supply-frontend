@@ -18,6 +18,30 @@ const StockMovement = ({ movements = [] }) => {
     return { total, pos, count };
   };
 
+  const getMovementType = (m) => {
+    // Get more specific type based on movement type and whether it's positive/negative
+    if (m.type === 'Supply') return { label: 'Stock In', color: 'success' };
+    if (m.type === 'Stockout') return { label: 'Stock Out', color: 'destructive' };
+    
+    // For adjustments, be more specific based on reason and direction
+    const total = (m.lines || []).reduce((s, d) => s + (Number(d.quantity) || 0), 0);
+    if (m.type === 'Adjustment') {
+      if (total > 0) {
+        if (m.remarks?.toLowerCase().includes('return')) {
+          return { label: 'Return In', color: 'success' };
+        }
+        return { label: 'Adjustment (+)', color: 'success' };
+      } else if (total < 0) {
+        if (m.remarks?.toLowerCase().includes('refund')) {
+          return { label: 'Refund Out', color: 'destructive' };
+        }
+        return { label: 'Adjustment (-)', color: 'destructive' };
+      }
+      return { label: 'No Change', color: 'warning' };
+    }
+    return { label: m.type, color: 'warning' };
+  };
+
   const formatDate = (d) => {
     try {
       const dt = new Date(d);
@@ -71,11 +95,10 @@ const StockMovement = ({ movements = [] }) => {
           <table className="min-w-full text-sm">
             <thead>
               <tr className="text-left text-muted-foreground">
-                <th className="py-2 pr-4">Date</th>
-                <th className="py-2 pr-4">Type</th>
-                <th className="py-2 pr-4">Net Qty</th>
+                <th className="py-2 pr-4 w-48">Date</th>
+                <th className="py-2 pr-4 w-40">Type</th>
+                <th className="py-2 pr-4 w-32">Net Qty</th>
                 <th className="py-2 pr-4">Details</th>
-                <th className="py-2 pr-4">Remarks</th>
               </tr>
             </thead>
             <tbody>
@@ -86,16 +109,21 @@ const StockMovement = ({ movements = [] }) => {
                   <React.Fragment key={rowKey}>
                     <tr className="border-t border-border hover:bg-muted/50 transition-colors">
                       <td className="py-2 pr-4 align-top w-48">{formatDate(m.date)}</td>
-                      <td className="py-2 pr-4 align-top w-32">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${m.type === 'Supply' ? 'bg-success/10 text-success' : m.type === 'Stockout' ? 'bg-destructive/10 text-destructive' : 'bg-warning/10 text-warning'}`}>
-                          {m.type}
-                        </span>
+                      <td className="py-2 pr-4 align-top">
+                        {(() => {
+                          const movementType = getMovementType(m);
+                          return (
+                            <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-${movementType.color}/10 text-${movementType.color}`}>
+                              {movementType.label}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="py-2 pr-4 align-top">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-sm font-semibold ${pos ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
-                          {pos ? '+' : ''}{total} qty
+                        <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold ${pos ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+                          {total > 0 ? '+' : ''}{total} qty
                         </span>
-                        <div className="text-xs text-muted-foreground mt-1">{count} line{count === 1 ? '' : 's'}</div>
+                        <div className="text-xs text-muted-foreground mt-1">{count} item{count === 1 ? '' : 's'}</div>
                       </td>
                       <td className="py-2 pr-4 align-top">
                         <div className="flex items-center gap-2">
