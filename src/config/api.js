@@ -40,16 +40,22 @@ export const API_ENDPOINTS = {
   // Roles
   EMPLOYEE_ROLES_BY_EMPLOYEE: (employeeId) => `${API_BASE_URL}/employee-roles/employee/${employeeId}`,
   ROLE_TYPE: (code) => `${API_BASE_URL}/role-types/${code}`,
+  // Role types (list)
+  EMPLOYEE_ROLES: `${API_BASE_URL}/role-types`,
 
   // Employee Contacts
   EMPLOYEE_CONTACTS: `${API_BASE_URL}/employee-contacts`,
+  EMPLOYEE_CONTACTS_BY_EMPLOYEE: (employeeId) => `${API_BASE_URL}/employee-contacts/employee/${employeeId}`,
 
   // Employee Attendance and details
   EMPLOYEE_ATTENDANCES: `${API_BASE_URL}/employee-attendances`,
+  // backward-compatible singular alias used in some pages
+  EMPLOYEE_ATTENDANCE: `${API_BASE_URL}/employee-attendances`,
   ATTENDANCE_DETAILS: `${API_BASE_URL}/attendance-details`,
 
   // Employee Role History
   EMPLOYEE_ROLE_HISTORIES: `${API_BASE_URL}/employee-role-histories`,
+  EMPLOYEE_ROLE_HISTORIES_BY_EMPLOYEE: (employeeId) => `${API_BASE_URL}/employee-role-histories/employee/${employeeId}`,
 
   // Payment Methods
   PAYMENT_METHODS: `${API_BASE_URL}/payment-methods`, // GET all
@@ -73,9 +79,11 @@ export const API_ENDPOINTS = {
 
   // Supplier Contacts
   SUPPLIER_CONTACTS: `${API_BASE_URL}/supplier-contacts`, // GET all, POST new
+  SUPPLIER_CONTACTS_BY_SUPPLIER: (supplierId) => `${API_BASE_URL}/supplier-contacts/supplier/${supplierId}`,
 
   // Supplier Addresses
   SUPPLIER_ADDRESSES: `${API_BASE_URL}/supplier-addresses`, // GET all, POST new
+  SUPPLIER_ADDRESSES_BY_SUPPLIER: (supplierId) => `${API_BASE_URL}/supplier-addresses/supplier/${supplierId}`,
 
   // Supplies
   SUPPLIES: `${API_BASE_URL}/supplies`, // GET all, POST new

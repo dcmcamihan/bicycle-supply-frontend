@@ -4,6 +4,12 @@ import ScrollToTop from "components/ScrollToTop";
 import ErrorBoundary from "components/ErrorBoundary";
 import NotFound from "pages/NotFound";
 import InventoryManagement from './pages/inventory-management';
+import ManagementDashboard from './pages/management';
+import CategoryManagement from './pages/management/categories';
+import BrandManagement from './pages/management/brands';
+import SupplierManagement from './pages/management/suppliers';
+import EmployeeManagement from './pages/management/employees';
+import AttendanceManagement from './pages/management/attendance';
 import LoginPage from './pages/login';
 import SignupPage from './pages/signup';
 import ForgotPassword from './pages/auth/ForgotPassword';
@@ -19,6 +25,7 @@ import ProcessReturn from './pages/returns/ProcessReturn';
 import PendingOrders from './pages/orders/PendingOrders';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastProvider } from './components/ui/Toast';
+import ManagerRoute from './components/auth/ManagerRoute';
 
 const PrivateRoute = ({ element }) => {
   const { user } = useAuth();
@@ -50,6 +57,15 @@ const Routes = () => {
           <Route path="/settings/profile" element={<PrivateRoute element={<ProfileSettings />} />} />
           <Route path="/settings/preferences" element={<PrivateRoute element={<Preferences />} />} />
           <Route path="/help-support" element={<PrivateRoute element={<HelpSupport />} />} />
+          
+          {/* Management Routes - Manager Only */}
+          <Route path="/management" element={<ManagerRoute element={<ManagementDashboard />} />} />
+          <Route path="/management/categories" element={<ManagerRoute element={<CategoryManagement />} />} />
+          <Route path="/management/brands" element={<ManagerRoute element={<BrandManagement />} />} />
+          <Route path="/management/suppliers" element={<ManagerRoute element={<SupplierManagement />} />} />
+          <Route path="/management/employees" element={<ManagerRoute element={<EmployeeManagement />} />} />
+          <Route path="/management/attendance" element={<ManagerRoute element={<AttendanceManagement />} />} />
+          
           <Route path="*" element={<NotFound />} />
         </RouterRoutes>
         </ToastProvider>

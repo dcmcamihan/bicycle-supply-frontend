@@ -3,11 +3,19 @@ import { Link, useLocation } from 'react-router-dom';
 import Icon from '../AppIcon';
 import Button from './Button';
 import API_ENDPOINTS from '../../config/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 const Sidebar = ({ isCollapsed = false, onToggle }) => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const location = useLocation();
   const [pendingCount, setPendingCount] = useState(0);
+  const { userRole, user } = useAuth();
+
+  // Debug logging
+  useEffect(() => {
+    console.log('Current user:', user);
+    console.log('User role:', userRole);
+  }, [user, userRole]);
 
   const navigationItems = [
     {
@@ -16,6 +24,40 @@ const Sidebar = ({ isCollapsed = false, onToggle }) => {
       icon: 'LayoutDashboard',
       description: 'Business overview and metrics'
     },
+    // Manager-only menu item
+    ...(userRole === 'Manager' ? [{
+      label: 'Management',
+      path: '/management',
+      icon: 'Settings',
+      description: 'Manage store operations',
+      subItems: [
+        {
+          label: 'Categories',
+          path: '/management/categories',
+          icon: 'Tag'
+        },
+        {
+          label: 'Brands',
+          path: '/management/brands',
+          icon: 'Bookmark'
+        },
+        {
+          label: 'Suppliers',
+          path: '/management/suppliers',
+          icon: 'Truck'
+        },
+        {
+          label: 'Employees',
+          path: '/management/employees',
+          icon: 'Users'
+        },
+        {
+          label: 'Attendance',
+          path: '/management/attendance',
+          icon: 'Calendar'
+        }
+      ]
+    }] : []),
     {
       label: 'Point of Sale',
       path: '/point-of-sale',
@@ -52,6 +94,9 @@ const Sidebar = ({ isCollapsed = false, onToggle }) => {
   const isActiveRoute = (path) => {
     if (path === '/inventory-management') {
       return location?.pathname === path || location?.pathname === '/product-details';
+    }
+    if (path === '/management') {
+      return location?.pathname.startsWith('/management');
     }
     return location?.pathname === path;
   };

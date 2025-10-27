@@ -29,14 +29,7 @@ export const AuthProvider = ({ children }) => {
       if (!Array.isArray(roles) || roles.length === 0) return '';
       const code = roles[0]?.role_type_code || roles[0]?.role_type || '';
       if (!code) return '';
-      try {
-        const r = await fetch(API_ENDPOINTS.ROLE_TYPE(code));
-        if (r.ok) {
-          const rt = await r.json();
-          return rt?.description || code;
-        }
-      } catch {}
-      return code;
+      return code === 'MANAGER' ? 'Manager' : code;
     } catch { return ''; }
   };
 
@@ -79,7 +72,15 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => saveUser(null);
 
-  const value = useMemo(() => ({ user, loading, login, signup, logout }), [user, loading]);
+  const userRole = user?.role || '';
+  const value = useMemo(() => ({ 
+    user, 
+    loading, 
+    login, 
+    signup, 
+    logout,
+    userRole 
+  }), [user, loading]);
 
   return (
     <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
