@@ -28,6 +28,26 @@ const Select = React.forwardRef(({
 }, ref) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
+    const selectRef = React.useRef(null);
+
+    // Click outside handler
+    React.useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (selectRef.current && !selectRef.current.contains(event.target)) {
+                setIsOpen(false);
+                onOpenChange?.(false);
+                setSearchTerm("");
+            }
+        };
+
+        if (isOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isOpen, onOpenChange]);
 
     // Generate unique ID if not provided
     const selectId = id || `select-${Math.random()?.toString(36)?.substr(2, 9)}`;
@@ -114,7 +134,12 @@ const Select = React.forwardRef(({
             )}
             <div className="relative">
                 <button
-                    ref={ref}
+                    ref={(el) => {
+                        // Merge the forwarded ref and our internal ref
+                        if (typeof ref === 'function') ref(el);
+                        else if (ref) ref.current = el;
+                        selectRef.current = el;
+                    }}
                     id={selectId}
                     type="button"
                     className={cn(
