@@ -205,13 +205,34 @@ const InventoryManagement = () => {
   // Recent movements (real data)
   const [recentMovements, setRecentMovements] = useState([]);
 
+  // Helper function to get product name
+  const getProductName = async (productId) => {
+    try {
+      const res = await fetch(API_ENDPOINTS.PRODUCT(productId));
+      if (res.ok) {
+        const product = await res.json();
+        return product.product_name || product.name || `Product #${productId}`;
+      }
+    } catch {}
+    return `Product #${productId}`;
+  };
+
   // Load recent movements from sales/supplies/stockouts
   useEffect(() => {
     const loadMovements = async () => {
       try {
-        // Build product name map from current products
+        // First fetch all products to ensure we have the latest names
+        const productsRes = await fetch(API_ENDPOINTS.PRODUCTS);
+        const products = productsRes.ok ? await productsRes.json() : [];
+        
+        // Build product name map from fresh product data
         const productNameMap = new Map();
-        mockProducts.forEach(p => productNameMap.set(Number(p.id), p.name));
+        for (const p of products) {
+          productNameMap.set(
+            Number(p.product_id),
+            p.product_name || p.name || await getProductName(p.product_id)
+          );
+        };
 
         const movements = [];
 
@@ -235,7 +256,7 @@ const InventoryManagement = () => {
                     movements.push({
                       id: `sale-${saleId}-${pid}`,
                       productId: pid,
-                      productName: productNameMap.get(pid) || `#${pid}`,
+                      productName: productNameMap.get(pid) || `Product #${pid}`,
                       type: 'sale',
                       quantity: -Math.abs(qty),
                       timestamp: saleDate
@@ -267,7 +288,7 @@ const InventoryManagement = () => {
                     movements.push({
                       id: `supply-${supplyId}-${pid}`,
                       productId: pid,
-                      productName: productNameMap.get(pid) || `#${pid}`,
+                      productName: productNameMap.get(pid) || `Product #${pid}`,
                       type: 'restock',
                       quantity: Math.abs(qty),
                       timestamp: supplyDate
@@ -328,14 +349,23 @@ const InventoryManagement = () => {
 
         // Sort DESC by timestamp and take latest 15
         movements.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-        setRecentMovements(movements.slice(0, 15));
+        const latestMovements = movements.slice(0, 15);
+        
+        // Ensure we have names for all products
+        for (const movement of latestMovements) {
+          if (!movement.productName || movement.productName.startsWith('#') || movement.productName.startsWith('Product #')) {
+            movement.productName = await getProductName(movement.productId);
+          }
+        }
+        
+        setRecentMovements(latestMovements);
       } catch (e) {
         setRecentMovements([]);
       }
     };
-    // Trigger when products mapped to have names
-    if (mockProducts.length > 0) loadMovements();
-  }, [mockProducts]);
+    // Load movements whenever rawProducts changes
+    loadMovements();
+  }, [rawProducts]);
 
   // Check for mobile viewport
   useEffect(() => {
