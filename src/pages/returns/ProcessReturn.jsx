@@ -35,6 +35,34 @@ const ProcessReturn = () => {
   const [histPage, setHistPage] = useState(1);
   const pageSize = 10;
 
+  // Helper to resolve status codes from anywhere in this component
+  const resolveStatusCodes = async (codes) => {
+    try {
+      const unique = Array.from(new Set((codes || []).map(String).filter(c => c)));
+      if (unique.length === 0) return;
+      const current = { ...statusMap };
+      const missing = unique.filter(c => !current[String(c)]);
+      if (missing.length === 0) return;
+      const fetched = await Promise.all(missing.map(async (code) => {
+        try {
+          const res = await fetch(`${API_ENDPOINTS.STATUSES}/${code}`);
+          if (res.ok) {
+            const s = await res.json();
+            return [String(code), s?.description || String(code)];
+          }
+        } catch (err) {}
+        return [String(code), String(code)];
+      }));
+      setStatusMap(prev => {
+        const next = { ...prev };
+        for (const [code, desc] of fetched) next[String(code)] = desc;
+        return next;
+      });
+    } catch (err) {
+      // ignore
+    }
+  };
+
   // Load sales and products lists
   useEffect(() => {
     const load = async () => {
@@ -49,48 +77,51 @@ const ProcessReturn = () => {
         setProducts(pData);
       } catch {}
       try {
-        // Load RETURN and SLRTSTAT (Sales Return Status) references
+        // Load RETURN and SLRTSTAT (Sales Return Status) reference lists and seed a local map
         const [resReturn, resSlrt] = await Promise.all([
           fetch(API_ENDPOINTS.STATUSES_BY_REFERENCE('RETURN')),
           fetch(API_ENDPOINTS.STATUSES_BY_REFERENCE('SLRTSTAT'))
         ]);
         const dataReturn = resReturn.ok ? await resReturn.json() : [];
         const dataSlrt = resSlrt.ok ? await resSlrt.json() : [];
-        const map = {};
-        for (const s of [...dataReturn, ...dataSlrt]) { map[String(s.status_code)] = s.description || s.status_code; }
-        setStatusMap(map);
-      } catch {}
-      try {
-        const rRes = await fetch(API_ENDPOINTS.RETURN_AND_REPLACEMENTS);
-        const rData = rRes.ok ? await rRes.json() : [];
-        const rows = Array.isArray(rData) ? rData : [];
-        setHistory(rows);
-        // Resolve any unknown status codes by querying /status/:id
-        const unknown = new Set();
-        for (const r of rows) {
-          const code = String(r.return_status);
-          if (!code) continue;
-          if (!statusMap[code]) unknown.add(code);
-        }
-        if (unknown.size > 0) {
-          const entries = Array.from(unknown);
-          const fetched = await Promise.all(entries.map(async (code) => {
-            try {
-              const res = await fetch(`${API_ENDPOINTS.STATUSES}/${code}`);
-              if (res.ok) {
-                const s = await res.json();
-                return [code, s?.description || code];
+        const seeded = {};
+        for (const s of [...dataReturn, ...dataSlrt]) seeded[String(s.status_code)] = s.description || s.status_code;
+
+        // Load history and fetch any missing status descriptions in one go to avoid state-races
+        try {
+          const rRes = await fetch(API_ENDPOINTS.RETURN_AND_REPLACEMENTS);
+          const rData = rRes.ok ? await rRes.json() : [];
+          const rows = Array.isArray(rData) ? rData : [];
+          setHistory(rows);
+
+          // gather unique codes from history
+          const codes = Array.from(new Set(rows.map(r => String(r.return_status)).filter(Boolean)));
+          const missing = codes.filter(c => !seeded[String(c)]);
+          const fetchedMap = {};
+          if (missing.length > 0) {
+            const fetched = await Promise.all(missing.map(async (code) => {
+              try {
+                const res = await fetch(`${API_ENDPOINTS.STATUSES}/${code}`);
+                if (res.ok) {
+                  const s = await res.json();
+                  return [String(code), s?.description || String(code)];
+                }
+              } catch (err) {
+                // ignore per-code error
               }
-            } catch {}
-            return [code, code];
-          }));
-          setStatusMap(prev => {
-            const next = { ...prev };
-            for (const [code, desc] of fetched) next[String(code)] = desc;
-            return next;
-          });
+              return [String(code), String(code)];
+            }));
+            for (const [code, desc] of fetched) fetchedMap[String(code)] = desc;
+          }
+
+          // set statusMap once (seeded + fetched, but preserve any pre-existing entries in state)
+          setStatusMap(prev => ({ ...seeded, ...fetchedMap, ...prev }));
+        } catch (err) {
+          // ignore history fetch errors
         }
-      } catch {}
+      } catch (err) {
+        // ignore status refs
+      }
     };
     load();
   }, []);
@@ -159,7 +190,8 @@ const ProcessReturn = () => {
           quantity: qty,
           return_status: '2001',
           transaction_date: new Date().toISOString(),
-          remarks: `Sale #${selectedSale.sale_id} • ${reason}`,
+          reason: reason.trim(),
+          action_type: actionType,
         };
         if (actionType === 'replacement' && replacementProductId) {
           body.replacement_product_id = Number(replacementProductId);
@@ -197,27 +229,7 @@ const ProcessReturn = () => {
         setHistory(rows);
         setHistPage(1);
         // Resolve any unknown status codes
-        const unknown = new Set();
-        for (const r of rows) {
-          const code = String(r.return_status || '');
-          if (!code) continue;
-          if (!statusMap[code]) unknown.add(code);
-        }
-        if (unknown.size > 0) {
-          const entries = Array.from(unknown);
-          const fetched = await Promise.all(entries.map(async (code) => {
-            try {
-              const res = await fetch(`${API_ENDPOINTS.STATUSES}/${code}`);
-              if (res.ok) { const s = await res.json(); return [code, s?.description || '']; }
-            } catch {}
-            return [code, ''];
-          }));
-          setStatusMap(prev => {
-            const next = { ...prev };
-            for (const [code, desc] of fetched) next[String(code)] = desc;
-            return next;
-          });
-        }
+        try { await resolveStatusCodes(rows.map(r=>r.return_status)); } catch {}
       } catch {}
     } catch (e1) {
       setError(e1?.message || 'Failed to process return');
@@ -263,7 +275,7 @@ const ProcessReturn = () => {
       <Header onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
       <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
       <main className={`pt-15 transition-smooth ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'}`}>
-        <div className="p-6 max-w-5xl">
+  <div className="p-6 w-full max-w-full">
           <Breadcrumb />
           <h1 className="font-heading font-bold text-2xl mb-2">Process Return</h1>
           <p className="font-body text-muted-foreground mb-6">Handle customer returns and replacements.</p>
@@ -356,12 +368,7 @@ const ProcessReturn = () => {
                         label="Status"
                         value={histStatus}
                         onChange={setHistStatus}
-                        options={[
-                          { value: '', label: 'All' },
-                          { value: 'PEND', label: 'Pending' },
-                          { value: 'APPR', label: 'Approved' },
-                          { value: 'POST', label: 'Posted' },
-                        ]}
+                        options={historyStatusOptions}
                         className="w-36"
                       />
                       <Input label="Start" type="date" value={histStart} onChange={(e)=>{ setHistStart(e.target.value); setHistPage(1); }} />
@@ -370,8 +377,8 @@ const ProcessReturn = () => {
                       <Button variant="ghost" onClick={()=>{ setHistStatus(''); setHistStart(''); setHistEnd(''); setHistQuery(''); setHistPage(1); }}>Clear</Button>
                     </div>
                   </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
+                  <div className="overflow-x-auto w-full">
+                    <table className="w-full min-w-full text-sm table-fixed">
                       <thead className="bg-muted">
                         <tr>
                           <th className="text-left px-3 py-2">Return ID</th>
@@ -379,8 +386,9 @@ const ProcessReturn = () => {
                           <th className="text-left px-3 py-2">Status</th>
                           <th className="text-left px-3 py-2">Sale Detail ID</th>
                           <th className="text-left px-3 py-2">Qty</th>
+                          <th className="text-left px-3 py-2">Action</th>
+                          <th className="text-left px-3 py-2">Reason</th>
                           <th className="text-left px-3 py-2">Replacement Product</th>
-                          <th className="text-left px-3 py-2">Remarks</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border">
@@ -400,8 +408,20 @@ const ProcessReturn = () => {
                             </td>
                             <td className="px-3 py-2">{r.sale_detail_id}</td>
                             <td className="px-3 py-2">{r.quantity}</td>
-                            <td className="px-3 py-2">{r.replacement_product_id || '-'}</td>
-                            <td className="px-3 py-2 truncate max-w-[220px]" title={r.remarks || ''}>{r.remarks || ''}</td>
+                            <td className="px-3 py-2">
+                              <span className={`inline-flex px-2 py-0.5 rounded-full ${r.action_type === 'replacement' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'} text-xs font-medium`}>
+                                {r.action_type || 'refund'}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 max-w-md truncate" title={r.reason}>{r.reason}</td>
+                            <td className="px-3 py-2">
+                              {r.replacement_product_id ? (
+                                (() => {
+                                  const prod = products.find(p => String(p.product_id || p.id) === String(r.replacement_product_id));
+                                  return prod ? prod.product_name || prod.name || String(r.replacement_product_id) : String(r.replacement_product_id);
+                                })()
+                              ) : '-'}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
