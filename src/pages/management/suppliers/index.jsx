@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import API_ENDPOINTS from '../../../config/api';
 import Header from '../../../components/ui/Header';
 import Sidebar from '../../../components/ui/Sidebar';
@@ -13,13 +13,16 @@ const SupplierManagement = () => {
   const [contactTypes, setContactTypes] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const toast = useToast();
+  const formRef = useRef(null);
 
   // Form state
   const [formData, setFormData] = useState({
     supplier_name: '',
     contacts: [{ contact_type_code: '', contact_value: '', is_primary: 'Y' }],
     address: '',
+    supplier_address_id: null,
     city: '',
+    barangay: '',
     state: '',
     country: '',
     postal_code: ''
@@ -80,6 +83,17 @@ const SupplierManagement = () => {
       const savedSupplier = await response.json();
 
       // Save supplier contacts
+      // If editing, remove existing contacts first so removals in the form persist
+      if (editingSupplier) {
+        try {
+          const existingRes = await fetch(API_ENDPOINTS.SUPPLIER_CONTACTS_BY_SUPPLIER(savedSupplier.supplier_id));
+          const existing = await existingRes.json();
+          await Promise.all(existing.map(c => fetch(`${API_ENDPOINTS.SUPPLIER_CONTACTS}/${c.supplier_contact_id}`, { method: 'DELETE' })));
+        } catch (err) {
+          console.warn('Failed to clear existing supplier contacts', err);
+        }
+      }
+
       const contactPromises = formData.contacts
         .filter(contact => contact.contact_type_code && contact.contact_value)
         .map(contact => {
@@ -103,23 +117,33 @@ const SupplierManagement = () => {
       await Promise.all(contactPromises);
 
       // Save supplier address if provided
-      if (formData.address || formData.city || formData.state || formData.country || formData.postal_code) {
+      if (formData.address || formData.city || formData.state || formData.country || formData.postal_code || formData.barangay) {
         const addressPayload = {
           supplier_id: savedSupplier.supplier_id,
           address_line1: formData.address,
           city: formData.city,
+          barangay: formData.barangay,
           state: formData.state,
           country: formData.country,
           postal_code: formData.postal_code
         };
 
-        await fetch(API_ENDPOINTS.SUPPLIER_ADDRESSES, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(addressPayload),
-        });
+        // If editing an existing address, update it instead of creating a new one
+        if (formData.supplier_address_id) {
+          await fetch(`${API_ENDPOINTS.SUPPLIER_ADDRESSES}/${formData.supplier_address_id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(addressPayload)
+          });
+        } else {
+          await fetch(API_ENDPOINTS.SUPPLIER_ADDRESSES, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(addressPayload),
+          });
+        }
       }
 
       // Refresh suppliers list
@@ -132,7 +156,9 @@ const SupplierManagement = () => {
         supplier_name: '',
         contacts: [{ contact_type_code: '', contact_value: '', is_primary: 'Y' }],
         address: '',
+        supplier_address_id: null,
         city: '',
+        barangay: '',
         state: '',
         country: '',
         postal_code: ''
@@ -165,19 +191,31 @@ const SupplierManagement = () => {
           contact_value: contact.contact_value,
           is_primary: contact.is_primary
         })) : [{ contact_type_code: '', contact_value: '', is_primary: 'Y' }],
-        address: primaryAddress.address_line1 || '',
+        supplier_address_id: primaryAddress.supplier_address_id || null,
+        address: primaryAddress.address_line1 || primaryAddress.street || '',
         city: primaryAddress.city || '',
-        state: primaryAddress.state || '',
+        barangay: primaryAddress.barangay || '',
+        state: primaryAddress.state || primaryAddress.province || '',
         country: primaryAddress.country || '',
-        postal_code: primaryAddress.postal_code || ''
+        postal_code: primaryAddress.postal_code || primaryAddress.zip_code || ''
       });
+      // scroll the form into view and focus first input so user sees they are editing
+      setTimeout(() => {
+        if (formRef.current) {
+          try { formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(e){}
+          const firstInput = formRef.current.querySelector('input, select, textarea');
+          if (firstInput) firstInput.focus();
+        }
+      }, 120);
     } catch (error) {
       console.error('Failed to fetch supplier details:', error);
       setFormData({
         supplier_name: supplier.supplier_name,
         contacts: [{ contact_type_code: '', contact_value: '', is_primary: 'Y' }],
+        supplier_address_id: null,
         address: '',
         city: '',
+        barangay: '',
         state: '',
         country: '',
         postal_code: ''
@@ -207,6 +245,27 @@ const SupplierManagement = () => {
     }
   };
 
+  const handleCancel = () => {
+    try {
+      setEditingSupplier(null);
+      setFormData({
+        supplier_name: '',
+        contacts: [{ contact_type_code: '', contact_value: '', is_primary: 'Y' }],
+        address: '',
+        supplier_address_id: null,
+        city: '',
+        barangay: '',
+        state: '',
+        country: '',
+        postal_code: ''
+      });
+    } catch (err) {
+      console.warn('Failed to reset supplier form', err);
+      // avoid throwing - show a gentle toast if available
+      toast?.error('Unable to cancel edit at this time');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Header onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
@@ -218,10 +277,20 @@ const SupplierManagement = () => {
             <h1 className="text-2xl font-bold mb-6">Supplier Management</h1>
 
             {/* Supplier Form */}
-            <form onSubmit={handleSubmit} className="bg-card p-6 rounded-lg border border-border mb-6">
+            <form ref={formRef} onSubmit={handleSubmit} className="bg-card p-6 rounded-lg border border-border mb-6">
               <h2 className="text-lg font-semibold mb-4">
                 {editingSupplier ? 'Edit Supplier' : 'Add New Supplier'}
               </h2>
+              {editingSupplier && (
+                <div className="mb-4 p-3 rounded border-l-4 border-yellow-400 bg-yellow-50 text-sm flex items-center justify-between">
+                  <div>
+                    <strong>Editing:</strong> {editingSupplier.supplier_name}
+                  </div>
+                  <div>
+                    <span className="text-xs text-muted-foreground">You are editing this supplier</span>
+                  </div>
+                </div>
+              )}
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div className="md:col-span-2">
@@ -347,6 +416,16 @@ const SupplierManagement = () => {
                 </div>
 
                 <div>
+                  <label className="block text-sm font-medium mb-1">Barangay</label>
+                  <input
+                    type="text"
+                    value={formData.barangay}
+                    onChange={(e) => setFormData({...formData, barangay: e.target.value})}
+                    className="w-full p-2 border rounded"
+                  />
+                </div>
+
+                <div>
                   <label className="block text-sm font-medium mb-1">State/Province</label>
                   <input
                     type="text"
@@ -382,20 +461,7 @@ const SupplierManagement = () => {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => {
-                      setEditingSupplier(null);
-                      setFormData({
-                        supplier_name: '',
-                        contact_person: '',
-                        email: '',
-                        phone: '',
-                        address: '',
-                        city: '',
-                        state: '',
-                        country: '',
-                        postal_code: ''
-                      });
-                    }}
+                    onClick={handleCancel}
                   >
                     Cancel
                   </Button>
@@ -434,7 +500,7 @@ const SupplierManagement = () => {
                       return (s.supplier_name || '').toLowerCase().includes(q) || String(s.supplier_id).includes(q);
                     })
                     .map(supplier => (
-                      <div key={supplier.supplier_id} className="p-4">
+                      <div key={supplier.supplier_id} className={`p-4 ${editingSupplier && editingSupplier.supplier_id === supplier.supplier_id ? 'bg-yellow-50 border-l-4 border-yellow-400' : ''}`}>
                         <div className="flex items-center justify-between mb-2">
                           <h3 className="font-medium">{supplier.supplier_name}</h3>
                           <div className="flex gap-2">
@@ -474,9 +540,10 @@ const SupplierManagement = () => {
                           {supplier.addresses?.length > 0 && (
                             <div>
                               <p>
-                                {supplier.addresses[0].address_line1}<br />
-                                {supplier.addresses[0].city}, {supplier.addresses[0].state}<br />
-                                {supplier.addresses[0].country} {supplier.addresses[0].postal_code}
+                  {(supplier.addresses[0].address_line1 || supplier.addresses[0].street)}<br />
+                  {supplier.addresses[0].barangay && (<>{supplier.addresses[0].barangay}<br /></>)}
+                  {supplier.addresses[0].city}, {supplier.addresses[0].state || supplier.addresses[0].province}<br />
+                  {supplier.addresses[0].country} {supplier.addresses[0].postal_code || supplier.addresses[0].zip_code}
                               </p>
                             </div>
                           )}

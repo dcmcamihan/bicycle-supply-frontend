@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import API_ENDPOINTS from '../../../config/api';
 import Header from '../../../components/ui/Header';
 import Sidebar from '../../../components/ui/Sidebar';
@@ -15,8 +15,14 @@ const BrandManagement = () => {
 
   // New brand form state
   const [formData, setFormData] = useState({
-    brand_name: ''
+    brand_name: '',
+    origin: '',
+    contact_person: '',
+    email: '',
+    phone: '',
+    website: ''
   });
+  const formRef = useRef(null);
 
   // Fetch brands
   useEffect(() => {
@@ -52,7 +58,8 @@ const BrandManagement = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          brand_name: formData.brand_name
+          brand_name: formData.brand_name,
+          origin: formData.origin
         }),
       });
 
@@ -68,6 +75,7 @@ const BrandManagement = () => {
       // Reset form
       setFormData({
         brand_name: '',
+        origin: '',
         contact_person: '',
         email: '',
         phone: '',
@@ -86,11 +94,22 @@ const BrandManagement = () => {
     setEditingBrand(brand);
     setFormData({
       brand_name: brand.brand_name,
+      origin: brand.origin || '',
       contact_person: brand.contact_person || '',
       email: brand.email || '',
       phone: brand.phone || '',
       website: brand.website || ''
     });
+    // Auto-scroll to the form and focus the first input so user sees the editing context
+    setTimeout(() => {
+      try {
+        formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const firstInput = formRef.current?.querySelector('input');
+        firstInput?.focus();
+      } catch (err) {
+        // ignore
+      }
+    }, 120);
   };
 
   const handleDelete = async (brand) => {
@@ -126,10 +145,20 @@ const BrandManagement = () => {
             <h1 className="text-2xl font-bold mb-6">Brand Management</h1>
 
             {/* Brand Form */}
-            <form onSubmit={handleSubmit} className="bg-card p-6 rounded-lg border border-border mb-6">
+            <form ref={formRef} onSubmit={handleSubmit} className="bg-card p-6 rounded-lg border border-border mb-6">
               <h2 className="text-lg font-semibold mb-4">
                 {editingBrand ? 'Edit Brand' : 'Add New Brand'}
               </h2>
+              {editingBrand && (
+                <div className="mb-4 p-3 rounded border-l-4 border-yellow-400 bg-yellow-50 text-sm flex items-center justify-between">
+                  <div>
+                    <strong>Editing brand ID:</strong> <span className="ml-1">{editingBrand.brand_id}</span>
+                  </div>
+                  <div>
+                    <span className="text-xs text-muted-foreground">You are editing this brand</span>
+                  </div>
+                </div>
+              )}
               
               <div className="mb-4">
                 <label className="block text-sm font-medium mb-1">Brand Name</label>
@@ -139,6 +168,16 @@ const BrandManagement = () => {
                   onChange={(e) => setFormData({...formData, brand_name: e.target.value})}
                   className="w-full p-2 border rounded"
                   required
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-1">Origin</label>
+                <input
+                  type="text"
+                  value={formData.origin}
+                  onChange={(e) => setFormData({...formData, origin: e.target.value})}
+                  className="w-full p-2 border rounded"
                 />
               </div>
 
@@ -195,9 +234,12 @@ const BrandManagement = () => {
                       return (b.brand_name || '').toLowerCase().includes(q) || String(b.brand_id).includes(q);
                     })
                     .map(brand => (
-                      <div key={brand.brand_id} className="p-4 flex items-center justify-between">
+                      <div key={brand.brand_id} className={`p-4 flex items-center justify-between ${editingBrand && editingBrand.brand_id === brand.brand_id ? 'ring-2 ring-accent rounded-md bg-accent/5' : ''}`}>
                         <div>
                           <h3 className="font-medium">{brand.brand_name}</h3>
+                          {brand.origin && (
+                            <p className="text-sm text-muted-foreground">Origin: {brand.origin}</p>
+                          )}
                           {brand.contact_person && (
                             <p className="text-sm text-muted-foreground">Contact: {brand.contact_person}</p>
                           )}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import API_ENDPOINTS from '../../../config/api';
 import Header from '../../../components/ui/Header';
 import Sidebar from '../../../components/ui/Sidebar';
@@ -14,11 +14,14 @@ const EmployeeManagement = () => {
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const toast = useToast();
+  const formRef = useRef(null);
 
   // Form state
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
+    gender: 'M',
+    birth_date: '',
     // contact list (use contact types from contact_types table)
     contacts: [{ contact_type_code: '', contact_value: '', is_primary: 'Y' }],
     role_id: '', // stores role_type_code from role-types API
@@ -73,7 +76,9 @@ const EmployeeManagement = () => {
         },
         body: JSON.stringify({
           first_name: formData.first_name,
-          last_name: formData.last_name
+          last_name: formData.last_name,
+          gender: formData.gender,
+          birth_date: formData.birth_date || null
         }),
       });
 
@@ -140,6 +145,8 @@ const EmployeeManagement = () => {
       setFormData({
         first_name: '',
         last_name: '',
+        gender: 'M',
+        birth_date: '',
         contacts: [{ contact_type_code: '', contact_value: '', is_primary: 'Y' }],
         role_id: ''
       });
@@ -167,6 +174,8 @@ const EmployeeManagement = () => {
       setFormData({
         first_name: employee.first_name,
         last_name: employee.last_name,
+        gender: employee.gender || 'M',
+        birth_date: employee.birth_date ? employee.birth_date.split('T')[0] : '',
         contacts: contacts.length > 0 ? contacts.map(c => ({
           contact_type_code: c.contact_type_code,
           contact_value: c.contact_value,
@@ -174,11 +183,21 @@ const EmployeeManagement = () => {
         })) : [{ contact_type_code: '', contact_value: '', is_primary: 'Y' }],
         role_id: currentRole?.role_type || ''
       });
+      // scroll the form into view and focus first input when editing starts
+      setTimeout(() => {
+        if (formRef.current) {
+          try { formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(e){}
+          const first = formRef.current.querySelector('input, select, textarea');
+          if (first) first.focus();
+        }
+      }, 120);
     } catch (error) {
       console.error('Failed to fetch employee details:', error);
       setFormData({
         first_name: employee.first_name,
         last_name: employee.last_name,
+        gender: employee.gender || 'M',
+        birth_date: employee.birth_date ? employee.birth_date.split('T')[0] : '',
         contacts: [{ contact_type_code: '', contact_value: '', is_primary: 'Y' }],
         role_id: ''
       });
@@ -218,10 +237,20 @@ const EmployeeManagement = () => {
             <h1 className="text-2xl font-bold mb-6">Employee Management</h1>
 
             {/* Employee Form */}
-            <form onSubmit={handleSubmit} className="bg-card p-6 rounded-lg border border-border mb-6">
+            <form ref={formRef} onSubmit={handleSubmit} className="bg-card p-6 rounded-lg border border-border mb-6">
               <h2 className="text-lg font-semibold mb-4">
                 {editingEmployee ? 'Edit Employee' : 'Add New Employee'}
               </h2>
+              {editingEmployee && (
+                <div className="mb-4 p-3 rounded border-l-4 border-yellow-400 bg-yellow-50 text-sm flex items-center justify-between">
+                  <div>
+                    <strong>Editing:</strong> {editingEmployee.first_name} {editingEmployee.last_name}
+                  </div>
+                  <div>
+                    <span className="text-xs text-muted-foreground">You are editing this employee</span>
+                  </div>
+                </div>
+              )}
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
@@ -243,6 +272,30 @@ const EmployeeManagement = () => {
                     onChange={(e) => setFormData({...formData, last_name: e.target.value})}
                     className="w-full p-2 border rounded"
                     required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Gender</label>
+                  <select
+                    value={formData.gender}
+                    onChange={(e) => setFormData({...formData, gender: e.target.value})}
+                    className="w-full p-2 border rounded"
+                    required
+                  >
+                    <option value="M">Male</option>
+                    <option value="F">Female</option>
+                    <option value="O">Other</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Birthdate</label>
+                  <input
+                    type="date"
+                    value={formData.birth_date}
+                    onChange={(e) => setFormData({...formData, birth_date: e.target.value})}
+                    className="w-full p-2 border rounded"
                   />
                 </div>
 
@@ -367,6 +420,8 @@ const EmployeeManagement = () => {
                       setFormData({
                         first_name: '',
                         last_name: '',
+                        gender: 'M',
+                        birth_date: '',
                         contacts: [{ contact_type_code: '', contact_value: '', is_primary: 'Y' }],
                         role_id: ''
                       });
@@ -411,7 +466,7 @@ const EmployeeManagement = () => {
                       return fullName.includes(q) || String(emp.employee_id).includes(q);
                     })
                     .map(employee => (
-                      <div key={employee.employee_id} className="p-4">
+                      <div key={employee.employee_id} className={`p-4 ${editingEmployee && editingEmployee.employee_id === employee.employee_id ? 'bg-yellow-50 border-l-4 border-yellow-400' : ''}`}>
                         <div className="flex items-center justify-between mb-2">
                           <h3 className="font-medium">
                             {employee.first_name} {employee.last_name}

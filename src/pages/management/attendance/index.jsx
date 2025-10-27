@@ -9,6 +9,7 @@ const AttendanceManagement = () => {
   const [employees, setEmployees] = useState([]);
   const [attendance, setAttendance] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [statuses, setStatuses] = useState([]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const toast = useToast();
@@ -32,6 +33,20 @@ const AttendanceManagement = () => {
         const empData = await empResponse.json();
         setEmployees(empData);
 
+        // Fetch all statuses (more reliable than assuming a specific reference exists)
+        try {
+          const allRes = await fetch(API_ENDPOINTS.STATUSES);
+          if (allRes.ok) {
+            const allData = await allRes.json();
+            setStatuses(allData || []);
+          } else {
+            setStatuses([]);
+          }
+        } catch (err) {
+          console.warn('Failed to load statuses', err);
+          setStatuses([]);
+        }
+
         // Fetch attendance for selected date
         await fetchAttendance(selectedDate);
       } catch (error) {
@@ -47,46 +62,125 @@ const AttendanceManagement = () => {
 
   const fetchAttendance = async (date) => {
     try {
-      const attResponse = await fetch(API_ENDPOINTS.EMPLOYEE_ATTENDANCE);
+      // Fetch employee attendance and attendance details so we can display time_in/time_out
+      const [attResponse, detailsResponse] = await Promise.all([
+        fetch(API_ENDPOINTS.EMPLOYEE_ATTENDANCE),
+        fetch(API_ENDPOINTS.ATTENDANCE_DETAILS)
+      ]);
+
       const attData = await attResponse.json();
-      // Normalize backend fields to what the UI expects:
-      // backend may return { date, attendance_status } or { attendance_date, status }
-      const normalized = (attData || []).map(rec => {
-        const attendance_date = rec.attendance_date || rec.date || rec.created_at || '';
-        const status = rec.status || rec.attendance_status || rec.attendance_status_code || '';
-        return { ...rec, attendance_date, status };
+      const detailsData = await detailsResponse.json();
+
+      // map details by attendance_id for quick lookup
+      const detailsByAttendance = (detailsData || []).reduce((acc, d) => {
+        acc[d.attendance_id] = d;
+        return acc;
+      }, {});
+
+      const normalized = (attData || []).map(att => {
+        const rawDate = att.attendance_date || att.date || null;
+        const attendance_date = rawDate ? (
+          String(rawDate).split('T')[0]
+        ) : null;
+        const det = detailsByAttendance[att.attendance_id];
+        return {
+          attendance_id: att.attendance_id,
+          employee_id: att.employee_id,
+          attendance_date,
+          status: att.status || att.attendance_status,
+          time_in: det ? det.time_in : null,
+          time_out: det ? det.time_out : null
+        };
       });
 
-      // Filter attendance for selected date (compare YYYY-MM-DD)
-      const filteredData = normalized.filter(att => {
-        if (!att.attendance_date) return false;
-        return att.attendance_date.split('T')[0] === date;
-      });
-      setAttendance(filteredData);
+      const filtered = normalized.filter(att => att.attendance_date === date);
+      setAttendance(filtered);
     } catch (error) {
       console.error('Failed to fetch attendance:', error);
       toast?.error('Failed to load attendance');
     }
   };
 
+  const getStatusLabel = (code) => {
+    if (!code) return code;
+    // Try finding by status_code first
+    let s = (statuses || []).find(st => String(st.status_code) === String(code));
+    if (s) return s.description;
+
+    // Try finding by description (some backends might already return description value)
+    s = (statuses || []).find(st => String(st.description).toLowerCase() === String(code).toLowerCase());
+    if (s) return s.description;
+
+    // Fallback: humanize common literals or convert snake/caps to friendly text
+    const upper = String(code).toUpperCase();
+    if (upper === 'PRESENT' || upper === 'P') return 'Present';
+    if (upper === 'ABSENT' || upper === 'A') return 'Absent';
+    if (upper === 'LATE' || upper === 'L') return 'Late';
+    if (upper === 'HALF_DAY' || upper === 'HALF' || upper === 'H') return 'Half Day';
+
+    // Last resort: convert underscores/dashes to spaces and capitalize
+    const human = String(code).replace(/[_-]+/g, ' ').toLowerCase().replace(/(^|\s)\S/g, t => t.toUpperCase());
+    return human;
+  };
+
+  const statusColorClass = (labelOrCode) => {
+    const label = String(getStatusLabel(labelOrCode)).toLowerCase();
+    if (label.includes('present')) return 'bg-green-100 text-green-800';
+    if (label.includes('absent')) return 'bg-red-100 text-red-800';
+    if (label.includes('late')) return 'bg-yellow-100 text-yellow-800';
+    if (label.includes('half')) return 'bg-orange-100 text-orange-800';
+    return 'bg-gray-100 text-gray-800';
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       // Create attendance record
+      // Map to backend expected fields: date, attendance_status
+      const payload = {
+        employee_id: formData.employee_id,
+        date: formData.attendance_date,
+        attendance_status: formData.status
+      };
+
       const response = await fetch(API_ENDPOINTS.EMPLOYEE_ATTENDANCE, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
         throw new Error('Failed to save attendance');
       }
 
-      // Refresh attendance list
-      await fetchAttendance(selectedDate);
+      const saved = await response.json();
+      const attendanceId = saved.attendance_id;
+
+      // If the status is not ABSENT, attempt to save attendance details (time_in/time_out)
+      if (formData.status !== 'ABSENT') {
+        // Require both time_in and time_out when saving details since DB expects TIME not null
+        if (!formData.time_in || !formData.time_out) {
+          // If missing time_out, default to time_in to avoid DB NOT NULL issues
+          const t_in = formData.time_in || '00:00:00';
+          const t_out = formData.time_out || t_in;
+          await fetch(API_ENDPOINTS.ATTENDANCE_DETAILS, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ attendance_id: attendanceId, time_in: t_in, time_out: t_out, remarks: null })
+          });
+        } else {
+          await fetch(API_ENDPOINTS.ATTENDANCE_DETAILS, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ attendance_id: attendanceId, time_in: formData.time_in, time_out: formData.time_out, remarks: null })
+          });
+        }
+      }
+
+  // Refresh attendance list
+  await fetchAttendance(selectedDate);
 
       // Reset form except for date
       setFormData({
@@ -167,10 +261,18 @@ const AttendanceManagement = () => {
                     className="w-full p-2 border rounded"
                     required
                   >
-                    <option value="PRESENT">Present</option>
-                    <option value="ABSENT">Absent</option>
-                    <option value="LATE">Late</option>
-                    <option value="HALF_DAY">Half Day</option>
+                    {statuses && statuses.length > 0 ? (
+                      statuses.map(s => (
+                        <option key={s.status_code} value={s.status_code}>{s.description}</option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="PRESENT">Present</option>
+                        <option value="ABSENT">Absent</option>
+                        <option value="LATE">Late</option>
+                        <option value="HALF_DAY">Half Day</option>
+                      </>
+                    )}
                   </select>
                 </div>
 
@@ -181,7 +283,8 @@ const AttendanceManagement = () => {
                     value={formData.time_in}
                     onChange={(e) => setFormData({...formData, time_in: e.target.value})}
                     className="w-full p-2 border rounded"
-                    required
+                    required={formData.status !== 'ABSENT'}
+                    disabled={formData.status === 'ABSENT'}
                   />
                 </div>
 
@@ -192,6 +295,8 @@ const AttendanceManagement = () => {
                     value={formData.time_out}
                     onChange={(e) => setFormData({...formData, time_out: e.target.value})}
                     className="w-full p-2 border rounded"
+                    required={formData.status !== 'ABSENT'}
+                    disabled={formData.status === 'ABSENT'}
                   />
                 </div>
               </div>
@@ -224,17 +329,12 @@ const AttendanceManagement = () => {
                             </h3>
                             <div className="text-sm text-muted-foreground mt-1">
                               <p>Status: {record.status}</p>
-                              <p>Time In: {record.time_in}</p>
-                              {record.time_out && <p>Time Out: {record.time_out}</p>}
+                              <p>Time In: {record.time_in ? record.time_in : '—'}</p>
+                              <p>Time Out: {record.time_out ? record.time_out : '—'}</p>
                             </div>
                           </div>
-                          <div className={`px-3 py-1 rounded text-sm ${
-                            record.status === 'PRESENT' ? 'bg-green-100 text-green-800' :
-                            record.status === 'ABSENT' ? 'bg-red-100 text-red-800' :
-                            record.status === 'LATE' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-orange-100 text-orange-800'
-                          }`}>
-                            {record.status}
+                          <div className={`px-3 py-1 rounded text-sm ${statusColorClass(record.status)}`}>
+                            {getStatusLabel(record.status)}
                           </div>
                         </div>
                       </div>

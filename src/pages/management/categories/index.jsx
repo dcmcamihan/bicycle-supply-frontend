@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import API_ENDPOINTS from '../../../config/api';
 import Header from '../../../components/ui/Header';
 import Sidebar from '../../../components/ui/Sidebar';
@@ -19,6 +19,7 @@ const CategoryManagement = () => {
     category_name: '',
     // description removed to match DB schema
   });
+  const formRef = useRef(null);
 
   // Fetch categories
   useEffect(() => {
@@ -42,6 +43,27 @@ const CategoryManagement = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      // basic client-side validation to avoid duplicate category_code
+      // trim inputs
+      const trimmed = {
+        category_code: (formData.category_code || '').toString().trim(),
+        category_name: (formData.category_name || '').toString().trim()
+      };
+
+      if (trimmed.category_code.length === 0 || trimmed.category_name.length === 0) {
+        toast?.error('Category code and name are required');
+        return;
+      }
+
+      if (trimmed.category_code.length > 8) {
+        toast?.error('Category code must be 8 characters or fewer');
+        return;
+      }
+
+      if (categories.some(c => c.category_code === trimmed.category_code && (!editingCategory || editingCategory.category_code !== trimmed.category_code))) {
+        toast?.error('Category code already exists');
+        return;
+      }
       const url = editingCategory 
         ? API_ENDPOINTS.CATEGORY(editingCategory.category_code)
         : API_ENDPOINTS.CATEGORIES;
@@ -53,11 +75,20 @@ const CategoryManagement = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(trimmed),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to save category');
+        // try to read server error message
+        let errText = 'Failed to save category';
+        try {
+          const err = await response.json();
+          if (err && err.error) errText = err.error;
+          else if (err && err.message) errText = err.message;
+        } catch (readErr) {
+          // ignore JSON parse errors
+        }
+        throw new Error(errText);
       }
 
       // Refresh categories list
@@ -75,7 +106,9 @@ const CategoryManagement = () => {
       toast?.success(editingCategory ? 'Category updated successfully' : 'Category created successfully');
     } catch (error) {
       console.error('Failed to save category:', error);
-      toast?.error('Failed to save category');
+      // show server-provided message when available
+      const msg = error && error.message ? error.message : 'Failed to save category';
+      toast?.error(msg);
     }
   };
 
@@ -85,6 +118,16 @@ const CategoryManagement = () => {
       category_code: category.category_code,
       category_name: category.category_name
     });
+    // Auto-scroll to the form and focus so the user sees the editing context
+    setTimeout(() => {
+      try {
+        formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const firstInput = formRef.current?.querySelector('input');
+        firstInput?.focus();
+      } catch (err) {
+        // ignore
+      }
+    }, 120);
   };
 
   const handleDelete = async (category) => {
@@ -120,10 +163,20 @@ const CategoryManagement = () => {
             <h1 className="text-2xl font-bold mb-6">Category Management</h1>
 
             {/* Category Form */}
-            <form onSubmit={handleSubmit} className="bg-card p-6 rounded-lg border border-border mb-6">
+            <form ref={formRef} onSubmit={handleSubmit} className="bg-card p-6 rounded-lg border border-border mb-6">
               <h2 className="text-lg font-semibold mb-4">
                 {editingCategory ? 'Edit Category' : 'Add New Category'}
               </h2>
+              {editingCategory && (
+                <div className="mb-4 p-3 rounded border-l-4 border-yellow-400 bg-yellow-50 text-sm flex items-center justify-between">
+                  <div>
+                    <strong>Editing category:</strong> <span className="ml-1">{editingCategory.category_code}</span>
+                  </div>
+                  <div>
+                    <span className="text-xs text-muted-foreground">You are editing this category</span>
+                  </div>
+                </div>
+              )}
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
@@ -132,6 +185,8 @@ const CategoryManagement = () => {
                     type="text"
                     value={formData.category_code}
                     onChange={(e) => setFormData({...formData, category_code: e.target.value})}
+                    // prevent changing the PK in the UI while editing to avoid FK issues
+                    readOnly={!!editingCategory}
                     className="w-full p-2 border rounded"
                     required
                   />
@@ -202,7 +257,7 @@ const CategoryManagement = () => {
                       return (cat.category_name || '').toLowerCase().includes(q) || (cat.category_code || '').toLowerCase().includes(q);
                     })
                     .map(category => (
-                      <div key={category.category_code} className="p-4 flex items-center justify-between">
+                      <div key={category.category_code} className={`p-4 flex items-center justify-between ${editingCategory && editingCategory.category_code === category.category_code ? 'ring-2 ring-accent rounded-md bg-accent/5' : ''}`}>
                         <div>
                           <h3 className="font-medium">{category.category_name}</h3>
                           <p className="text-sm text-muted-foreground">Code: {category.category_code}</p>
