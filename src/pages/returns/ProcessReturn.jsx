@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import Header from '../../components/ui/Header';
 import Sidebar from '../../components/ui/Sidebar';
 import Breadcrumb from '../../components/ui/Breadcrumb';
@@ -28,12 +28,54 @@ const ProcessReturn = () => {
   // History state
   const [history, setHistory] = useState([]);
   const [statusMap, setStatusMap] = useState({}); // code -> description
-  const [histStatus, setHistStatus] = useState(''); // '', PEND, APPR, POST
+  // histAction filters by action_type on history rows (e.g. 'refund' | 'replacement')
+  const [histAction, setHistAction] = useState(''); // '', 'refund', 'replacement'
   const [histQuery, setHistQuery] = useState(''); // return_id or sale_detail_id
   const [histStart, setHistStart] = useState(''); // yyyy-mm-dd
   const [histEnd, setHistEnd] = useState('');
   const [histPage, setHistPage] = useState(1);
   const pageSize = 10;
+
+  // Column resize state: keep widths for history table columns
+  const tableRef = useRef(null);
+  const resizeStateRef = useRef(null); // { key, startX, startWidth }
+  const [colWidths, setColWidths] = useState({
+    returnId: '100px',
+    date: '160px',
+    status: '140px',
+    saleDetail: '120px',
+    qty: '80px',
+    action: '120px',
+    reason: '280px',
+    replacement: '180px'
+  });
+
+  // Mouse move/up handlers for resize
+  useEffect(() => {
+    const onMove = (e) => {
+      const s = resizeStateRef.current;
+      if (!s) return;
+      const delta = e.clientX - s.startX;
+      const newW = Math.max(40, s.startWidth + delta);
+      setColWidths(prev => ({ ...prev, [s.key]: `${newW}px` }));
+    };
+    const onUp = () => { resizeStateRef.current = null; document.body.style.cursor = ''; }
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, []);
+
+  const startResize = (key, e) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const cur = tableRef.current;
+    const startWidth = cur ? (cur.querySelector(`col[data-col="${key}"]`)?.offsetWidth || parseInt(String(colWidths[key]).replace(/px/,''),10) || 100) : (parseInt(String(colWidths[key]).replace(/px/,''),10) || 100);
+    resizeStateRef.current = { key, startX, startWidth };
+    document.body.style.cursor = 'col-resize';
+  };
 
   // Helper to resolve status codes from anywhere in this component
   const resolveStatusCodes = async (codes) => {
@@ -239,7 +281,7 @@ const ProcessReturn = () => {
   // Derived: filter + paginate history
   const filteredHistory = useMemo(() => {
     let rows = history;
-    if (histStatus) rows = rows.filter(r => String(r.return_status) === histStatus);
+    if (histAction) rows = rows.filter(r => String(r.action_type) === String(histAction));
     if (histQuery) {
       const q = histQuery.toLowerCase();
       rows = rows.filter(r => String(r.return_id||'').includes(q) || String(r.sale_detail_id||'').includes(q));
@@ -255,7 +297,7 @@ const ProcessReturn = () => {
       rows = rows.filter(r => r.transaction_date && new Date(r.transaction_date) <= e);
     }
     return rows.sort((a,b)=> new Date(b.transaction_date||0)-new Date(a.transaction_date||0));
-  }, [history, histStatus, histQuery, histStart, histEnd]);
+  }, [history, histAction, histQuery, histStart, histEnd]);
 
   const totalPages = Math.max(1, Math.ceil(filteredHistory.length / pageSize));
   const pagedHistory = useMemo(() => {
@@ -263,12 +305,12 @@ const ProcessReturn = () => {
     return filteredHistory.slice(start, start + pageSize);
   }, [filteredHistory, histPage]);
 
-  // Build dynamic status options from history + status map
-  const historyStatusOptions = useMemo(() => {
-    const codes = Array.from(new Set((history || []).map(r => String(r.return_status)).filter(Boolean)));
-    const opts = codes.map(code => ({ value: code, label: statusMap[String(code)] || 'Unknown' }));
+  // Build dynamic action options from history (replacement/refund)
+  const historyActionOptions = useMemo(() => {
+    const actions = Array.from(new Set((history || []).map(r => String(r.action_type)).filter(Boolean)));
+    const opts = actions.map(action => ({ value: action, label: action ? (action.charAt(0).toUpperCase() + action.slice(1)) : 'Unknown' }));
     return [{ value: '', label: 'All' }, ...opts];
-  }, [history, statusMap]);
+  }, [history]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -365,36 +407,86 @@ const ProcessReturn = () => {
                   <div className="flex flex-col gap-3">
                     <div className="flex gap-2 items-end flex-wrap">
                       <Select
-                        label="Status"
-                        value={histStatus}
-                        onChange={setHistStatus}
-                        options={historyStatusOptions}
+                        label="Action"
+                        value={histAction}
+                        onChange={(v)=>{ setHistAction(v); setHistPage(1); }}
+                        options={historyActionOptions}
                         className="w-36"
                       />
                       <Input label="Start" type="date" value={histStart} onChange={(e)=>{ setHistStart(e.target.value); setHistPage(1); }} />
                       <Input label="End" type="date" value={histEnd} onChange={(e)=>{ setHistEnd(e.target.value); setHistPage(1); }} />
                       <Input label="Search (ID or Sale Detail)" value={histQuery} onChange={(e)=>{ setHistQuery(e.target.value); setHistPage(1); }} className="min-w-[180px]" />
-                      <Button variant="ghost" onClick={()=>{ setHistStatus(''); setHistStart(''); setHistEnd(''); setHistQuery(''); setHistPage(1); }}>Clear</Button>
+                      <Button variant="ghost" onClick={()=>{ setHistAction(''); setHistStart(''); setHistEnd(''); setHistQuery(''); setHistPage(1); }}>Clear</Button>
                     </div>
                   </div>
                   <div className="overflow-x-auto w-full">
-                    <table className="w-full min-w-full text-sm table-fixed">
+                    <table ref={tableRef} className="w-full min-w-full text-sm table-fixed" style={{ tableLayout: 'fixed' }}>
+                      <colgroup>
+                        <col data-col="returnId" style={{ width: colWidths.returnId }} />
+                        <col data-col="date" style={{ width: colWidths.date }} />
+                        <col data-col="status" style={{ width: colWidths.status }} />
+                        <col data-col="saleDetail" style={{ width: colWidths.saleDetail }} />
+                        <col data-col="qty" style={{ width: colWidths.qty }} />
+                        <col data-col="action" style={{ width: colWidths.action }} />
+                        <col data-col="reason" style={{ width: colWidths.reason }} />
+                        <col data-col="replacement" style={{ width: colWidths.replacement }} />
+                      </colgroup>
                       <thead className="bg-muted">
                         <tr>
-                          <th className="text-left px-3 py-2">Return ID</th>
-                          <th className="text-left px-3 py-2">Date</th>
-                          <th className="text-left px-3 py-2">Status</th>
-                          <th className="text-left px-3 py-2">Sale Detail ID</th>
-                          <th className="text-left px-3 py-2">Qty</th>
-                          <th className="text-left px-3 py-2">Action</th>
-                          <th className="text-left px-3 py-2">Reason</th>
-                          <th className="text-left px-3 py-2">Replacement Product</th>
+                          <th className="text-left px-3 py-2 relative">
+                            <div className="flex items-center justify-between">
+                              <span>Return ID</span>
+                              <span className="w-1 h-6 cursor-col-resize" onMouseDown={(e)=>startResize('returnId', e)} style={{ display: 'inline-block' }} />
+                            </div>
+                          </th>
+                          <th className="text-left px-3 py-2 relative">
+                            <div className="flex items-center justify-between">
+                              <span>Date</span>
+                              <span className="w-1 h-6 cursor-col-resize" onMouseDown={(e)=>startResize('date', e)} style={{ display: 'inline-block' }} />
+                            </div>
+                          </th>
+                          <th className="text-left px-3 py-2 relative">
+                            <div className="flex items-center justify-between">
+                              <span>Status</span>
+                              <span className="w-1 h-6 cursor-col-resize" onMouseDown={(e)=>startResize('status', e)} style={{ display: 'inline-block' }} />
+                            </div>
+                          </th>
+                          <th className="text-left px-3 py-2 relative">
+                            <div className="flex items-center justify-between">
+                              <span>Sale Detail ID</span>
+                              <span className="w-1 h-6 cursor-col-resize" onMouseDown={(e)=>startResize('saleDetail', e)} style={{ display: 'inline-block' }} />
+                            </div>
+                          </th>
+                          <th className="text-left px-3 py-2 relative">
+                            <div className="flex items-center justify-between">
+                              <span>Qty</span>
+                              <span className="w-1 h-6 cursor-col-resize" onMouseDown={(e)=>startResize('qty', e)} style={{ display: 'inline-block' }} />
+                            </div>
+                          </th>
+                          <th className="text-left px-3 py-2 relative">
+                            <div className="flex items-center justify-between">
+                              <span>Action</span>
+                              <span className="w-1 h-6 cursor-col-resize" onMouseDown={(e)=>startResize('action', e)} style={{ display: 'inline-block' }} />
+                            </div>
+                          </th>
+                          <th className="text-left px-3 py-2 relative">
+                            <div className="flex items-center justify-between">
+                              <span>Reason</span>
+                              <span className="w-1 h-6 cursor-col-resize" onMouseDown={(e)=>startResize('reason', e)} style={{ display: 'inline-block' }} />
+                            </div>
+                          </th>
+                          <th className="text-left px-3 py-2 relative">
+                            <div className="flex items-center justify-between">
+                              <span>Replacement Product</span>
+                              <span className="w-1 h-6 cursor-col-resize" onMouseDown={(e)=>startResize('replacement', e)} style={{ display: 'inline-block' }} />
+                            </div>
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border">
                         {pagedHistory.length === 0 && (
                           <tr>
-                            <td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">No history found.</td>
+                            <td colSpan={8} className="px-3 py-6 text-center text-muted-foreground">No history found.</td>
                           </tr>
                         )}
                         {pagedHistory.map(r => (
