@@ -117,8 +117,17 @@ const SalesReports = () => {
     }
   };
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  // Default dateRange set to 'today' for immediate, relevant insights
-  const [dateRange, setDateRange] = useState('today');
+  // Default dateRange set to 'last7days' (show last 7 days by default)
+  // Persist last selected dateRange in localStorage so returning users keep their preference
+  const [dateRange, setDateRange] = useState(() => {
+    try {
+      const raw = localStorage.getItem('salesReports.dateRange');
+      if (raw) return JSON.parse(raw);
+    } catch (e) {
+      // ignore
+    }
+    return 'last7days';
+  });
   const [reportType, setReportType] = useState('daily');
   const [customRange, setCustomRange] = useState({ start: '', end: '' });
   const [chartTimeframe, setChartTimeframe] = useState('hourly');
@@ -584,12 +593,11 @@ const SalesReports = () => {
   };
 
   const handleDateRangeChange = (newRange) => {
-    if (newRange === 'custom') {
-      // Use current custom range object for filtering
-      setDateRange({ ...customRange });
-    } else {
-      setDateRange(newRange);
-    }
+    const value = newRange === 'custom' ? { ...customRange } : newRange;
+    setDateRange(value);
+    try {
+      localStorage.setItem('salesReports.dateRange', JSON.stringify(value));
+    } catch (e) { /* ignore */ }
   };
 
   const handleReportTypeChange = (newType) => {
@@ -605,6 +613,7 @@ const SalesReports = () => {
     // If currently on custom, push updates to active dateRange
     if (typeof dateRange === 'object') {
       setDateRange({ ...range });
+      try { localStorage.setItem('salesReports.dateRange', JSON.stringify({ ...range })); } catch (e) {}
     }
   };
 
@@ -1081,6 +1090,28 @@ const SalesReports = () => {
     document.title = 'Sales Reports - Jolens BikeShop';
   }, []);
 
+  // Compute a friendly active range label for the header (e.g. "Showing Last 7 Days: 2025-10-21 to 2025-10-27")
+  const computeActiveRangeLabel = (range) => {
+    if (!range) return '';
+    const labels = {
+      today: 'Today',
+      yesterday: 'Yesterday',
+      last7days: 'Last 7 Days',
+      last30days: 'Last 30 Days',
+      thisMonth: 'This Month',
+      lastMonth: 'Last Month',
+      thisYear: 'This Year',
+      custom: 'Custom Range'
+    };
+    const { start, end } = getDateRangeBounds(range);
+    // end from getDateRangeBounds is exclusive for most presets; show inclusive end by subtracting 1ms
+    const displayStart = start ? start.toISOString().split('T')[0] : '';
+    const displayEnd = end ? new Date(end.getTime() - 1).toISOString().split('T')[0] : '';
+    const base = (typeof range === 'object') ? labels.custom : (labels[range] || String(range));
+    return `${base}: ${displayStart}${displayEnd ? ' to ' + displayEnd : ''}`;
+  };
+  const activeRangeLabel = computeActiveRangeLabel(dateRange);
+
   return (
     <div className="min-h-screen bg-background">
       <Header onSidebarToggle={handleSidebarToggle} />
@@ -1109,6 +1140,7 @@ const SalesReports = () => {
                 setIsLoading(false);
               }, 1000);
             }}
+            activeRangeLabel={activeRangeLabel}
           />
 
           {/* KPI Cards */}

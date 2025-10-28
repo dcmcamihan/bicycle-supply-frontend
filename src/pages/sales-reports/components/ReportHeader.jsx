@@ -13,6 +13,7 @@ const ReportHeader = ({
   onRefresh,
   customRange,
   onCustomRangeChange,
+  activeRangeLabel,
 }) => {
   const [isExporting, setIsExporting] = useState(false);
 
@@ -85,6 +86,11 @@ const ReportHeader = ({
               className="w-full sm:w-40"
             />
           </div>
+          {activeRangeLabel && (
+            <div className="mt-2 text-sm text-muted-foreground">
+              {activeRangeLabel}
+            </div>
+          )}
         </div>
 
         {/* Right Section - Actions */}
