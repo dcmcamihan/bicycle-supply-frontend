@@ -480,38 +480,51 @@ const PointOfSale = () => {
                   
                   {lastTransaction && (
                     <div className="bg-muted border border-border rounded-lg p-4 mb-6 text-left">
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <span className="text-muted-foreground">Transaction ID:</span>
-                          <p className="font-data font-medium">{lastTransaction?.transactionId}</p>
+                      <div id="receipt" className="max-w-md mx-auto font-mono text-sm">
+                        {/* Print styles for receipt */}
+                        <style>{`
+                          @media print {
+                            body * { visibility: hidden; }
+                            #receipt, #receipt * { visibility: visible; }
+                            #receipt { position: absolute; left: 0; top: 0; width: 320px; transform: none; margin: 0; }
+                            /* Narrow receipt look */
+                            #receipt { font-family: 'Courier New', Courier, monospace; font-size: 12px; }
+                            /* Remove background colors */
+                            #receipt { background: white; }
+                          }
+                          @page { size: 80mm auto; margin: 4mm; }
+                        `}</style>
+                        <div className="text-center mb-3">
+                          <div className="font-heading font-bold text-lg">Jolens BikeShop</div>
+                          <div className="text-xs text-muted-foreground">Official Receipt</div>
+                          <div className="text-xs text-muted-foreground">{new Date().toLocaleString()}</div>
                         </div>
-                        <div>
-                          <span className="text-muted-foreground">Payment Method:</span>
-                          <p className="font-medium">{lastTransaction?.method}</p>
+                        <div className="mb-2">
+                          <div className="flex justify-between text-xs"><span>Transaction ID</span><span>{lastTransaction?.transactionId}</span></div>
+                          <div className="flex justify-between text-xs"><span>Cashier</span><span>{employees?.find(e=>String(e.employee_id)===String(cashierId)) ? `${employees.find(e=>String(e.employee_id)===String(cashierId))?.first_name} ${employees.find(e=>String(e.employee_id)===String(cashierId))?.last_name}` : cashierId}</span></div>
+                          <div className="flex justify-between text-xs"><span>Payment Method</span><span>{lastTransaction?.method}</span></div>
                         </div>
-                        <div>
-                          <span className="text-muted-foreground">Amount:</span>
-                          <p className="font-heading font-bold text-primary">
-                            {new Intl.NumberFormat('en-PH', {
-                              style: 'currency',
-                              currency: 'PHP'
-                            })?.format(lastTransaction?.amount)}
-                          </p>
+                        <div className="border-t border-border pt-2">
+                          {lastTransaction?.items?.map((it, idx) => (
+                            <div key={idx} className="flex justify-between py-1">
+                              <div className="truncate w-2/3">{it.name || it?.product_name || `Item ${it.id}` } x{it.quantity}</div>
+                              <div className="text-right w-1/3">{new Intl.NumberFormat('en-PH',{style:'currency',currency:'PHP'}).format((it.price || 0) * it.quantity)}</div>
+                            </div>
+                          ))}
                         </div>
-                        <div>
-                          <span className="text-muted-foreground">Items:</span>
-                          <p className="font-medium">
-                            {lastTransaction?.items?.reduce((sum, item) => sum + item?.quantity, 0)} items
-                          </p>
+                        <div className="border-t border-border pt-2 mt-2">
+                          <div className="flex justify-between"><span>Subtotal</span><span>{new Intl.NumberFormat('en-PH',{style:'currency',currency:'PHP'}).format(lastTransaction?.items?.reduce((s,i)=>s + ((i.price||0)*(i.quantity||0)),0) || 0)}</span></div>
+                          <div className="flex justify-between"><span>Total</span><span className="font-heading font-bold">{new Intl.NumberFormat('en-PH',{style:'currency',currency:'PHP'}).format(lastTransaction?.amount || 0)}</span></div>
+                          <div className="flex justify-between"><span>Amount Tendered</span><span>{new Intl.NumberFormat('en-PH',{style:'currency',currency:'PHP'}).format(lastTransaction?.amountTendered ?? lastTransaction?.amount ?? 0)}</span></div>
+                          <div className="flex justify-between"><span>Change</span><span>{new Intl.NumberFormat('en-PH',{style:'currency',currency:'PHP'}).format(lastTransaction?.change ?? 0)}</span></div>
                         </div>
+                        {lastTransaction?.customer && (
+                          <div className="mt-3 text-xs">
+                            <div className="text-muted-foreground">Customer</div>
+                            <div className="font-medium">{lastTransaction?.customer?.name}</div>
+                          </div>
+                        )}
                       </div>
-                      
-                      {lastTransaction?.customer && (
-                        <div className="mt-4 pt-4 border-t border-border">
-                          <span className="text-muted-foreground">Customer:</span>
-                          <p className="font-medium">{lastTransaction?.customer?.name}</p>
-                        </div>
-                      )}
                     </div>
                   )}
                   
@@ -593,6 +606,7 @@ const PointOfSale = () => {
 
                   <PaymentMethods
                     total={cartTotal}
+                    cartItems={cartItems}
                     onPaymentComplete={handlePaymentComplete}
                     disabled={cartItems?.length === 0}
                   />
