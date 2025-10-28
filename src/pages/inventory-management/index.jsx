@@ -77,12 +77,18 @@ const InventoryManagement = () => {
     const fetchProducts = async () => {
       try {
         const response = await fetch(API_ENDPOINTS.PRODUCTS);
+        if (!response.ok) throw new Error('Failed to fetch products');
         const data = await response.json();
-        setRawProducts(data);
+        // Keep rawProducts as the canonical API response; mapping to UI shape
+        // happens in the separate mapProducts effect which depends on rawProducts.
+        setRawProducts(data || []);
       } catch (error) {
         console.error('Failed to fetch products:', error);
+        setRawProducts([]);
       }
     };
+    // expose for refresh by other handlers
+    window.__inventory_fetchProducts = fetchProducts;
     fetchProducts();
   }, []);
 
@@ -148,6 +154,14 @@ const InventoryManagement = () => {
   // Suppliers state
   const [mockSuppliers, setMockSuppliers] = useState([]);
   const [productSupplierMap, setProductSupplierMap] = useState(new Map()); // product_id -> latest supplier_id
+  // Bulk action UI state
+  const [showBulkPriceModal, setShowBulkPriceModal] = useState(false);
+  const [bulkPriceValue, setBulkPriceValue] = useState('');
+  const [bulkPriceMode, setBulkPriceMode] = useState('set'); // 'set' or 'percent'
+  const [showBulkCategoryModal, setShowBulkCategoryModal] = useState(false);
+  const [bulkCategoryId, setBulkCategoryId] = useState('');
+  const [showBulkEditModal, setShowBulkEditModal] = useState(false);
+  const [bulkEditFields, setBulkEditFields] = useState({});
 
   // Fetch suppliers from API
   useEffect(() => {
@@ -657,30 +671,70 @@ const InventoryManagement = () => {
   };
 
   const handleBulkEdit = () => {
-    console.log('Bulk editing items:', selectedItems);
-    alert(`Bulk edit would open for ${selectedItems?.length} selected items`);
+    // Open bulk edit modal
+    setBulkEditFields({});
+    setShowBulkEditModal(true);
   };
 
   const handleBulkDelete = () => {
-    if (window.confirm(`Are you sure you want to delete ${selectedItems?.length} selected items?`)) {
-      console.log('Bulk deleting items:', selectedItems);
-      setSelectedItems([]);
-    }
+    if (!selectedItems || selectedItems.length === 0) return alert('No items selected');
+    if (!window.confirm(`Archive ${selectedItems?.length} selected items? This will hide them from lists.`)) return;
+    (async () => {
+      try {
+        for (const id of selectedItems) {
+          try {
+            const res = await fetch(API_ENDPOINTS.PRODUCT_ARCHIVE(id), { method: 'PUT' });
+            if (!res.ok) {
+              const t = await res.text().catch(()=>null);
+              console.warn('Archive failed for', id, t);
+            }
+          } catch (err) {
+            console.warn('Archive request failed for', id, err);
+          }
+        }
+        // refresh products
+        try { await (window.__inventory_fetchProducts?.()); } catch {}
+        setSelectedItems([]);
+        try { toast?.success && toast.success('Selected items archived'); } catch {}
+      } catch (err) {
+        console.error('Bulk delete error', err);
+        try { toast?.error && toast.error('Failed to archive selected items'); } catch {}
+      }
+    })();
   };
 
   const handleBulkExport = () => {
-    console.log('Exporting items:', selectedItems);
-    alert(`Exporting ${selectedItems?.length} selected items to CSV`);
+    // Export selected items (if any) or all filtered products
+    const rows = (selectedItems && selectedItems.length > 0)
+      ? mockProducts.filter(p => selectedItems.includes(p.id))
+      : filteredAndSortedProducts;
+    if (!rows || rows.length === 0) return alert('No data to export');
+    const headers = ['id','name','category','brand','price','stock','reorderLevel'];
+    const csv = [headers.join(',')].concat(rows.map(r => (
+      [r.id, `"${String(r.name).replace(/"/g,'""')}"`, r.category || '', r.brand || '', r.price || 0, r.stock || 0, r.reorderLevel || ''].join(',')
+    ))).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `inventory_export_${Date.now()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   };
 
   const handleBulkPriceUpdate = () => {
-    console.log('Bulk price update for items:', selectedItems);
-    alert(`Price update dialog would open for ${selectedItems?.length} selected items`);
+    if (!selectedItems || selectedItems.length === 0) return alert('No items selected');
+    setBulkPriceValue('');
+    setBulkPriceMode('set');
+    setShowBulkPriceModal(true);
   };
 
   const handleBulkCategoryUpdate = () => {
-    console.log('Bulk category update for items:', selectedItems);
-    alert(`Category update dialog would open for ${selectedItems?.length} selected items`);
+    if (!selectedItems || selectedItems.length === 0) return alert('No items selected');
+    setBulkCategoryId('');
+    setShowBulkCategoryModal(true);
   };
 
   const handleReorderClick = (item) => {
@@ -694,6 +748,89 @@ const InventoryManagement = () => {
   const handleViewMovements = () => {
     // Open modal showing all recent stock movements
     setShowMovementsModal(true);
+  };
+
+  // Perform bulk price update
+  const performBulkPriceUpdate = async () => {
+    if (!bulkPriceValue) return alert('Provide a price or percentage');
+    const parsed = parseFloat(bulkPriceValue);
+    if (isNaN(parsed)) return alert('Invalid value');
+    try {
+      for (const id of selectedItems) {
+        try {
+          // Fetch product to get current fields
+          const pRes = await fetch(API_ENDPOINTS.PRODUCT(id));
+          const p = pRes.ok ? await pRes.json() : null;
+          if (!p) continue;
+          let newPrice = Number(p.price || 0);
+          if (bulkPriceMode === 'set') newPrice = parsed;
+          else if (bulkPriceMode === 'percent') newPrice = +(newPrice * (1 + parsed/100)).toFixed(2);
+          const payload = { price: newPrice };
+          const res = await fetch(API_ENDPOINTS.PRODUCT(id), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+          if (!res.ok) {
+            const t = await res.text().catch(()=>null);
+            console.warn('Failed update price for', id, t);
+          }
+        } catch (err) {
+          console.warn('Error updating price for', id, err);
+        }
+      }
+      // refresh
+      try { await (window.__inventory_fetchProducts?.()); } catch {}
+      setShowBulkPriceModal(false);
+      setSelectedItems([]);
+      try { toast?.success && toast.success('Prices updated'); } catch {}
+    } catch (err) {
+      console.error('Bulk price update failed', err);
+      try { toast?.error && toast.error('Failed to update prices'); } catch {}
+    }
+  };
+
+  // Perform bulk category change
+  const performBulkCategoryChange = async () => {
+    if (!bulkCategoryId) return alert('Select category');
+    try {
+      for (const id of selectedItems) {
+        try {
+          const payload = { category_code: bulkCategoryId };
+          const res = await fetch(API_ENDPOINTS.PRODUCT(id), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+          if (!res.ok) {
+            const t = await res.text().catch(()=>null);
+            console.warn('Failed change category for', id, t);
+          }
+        } catch (err) { console.warn('Error changing category for', id, err); }
+      }
+      try { await (window.__inventory_fetchProducts?.()); } catch {}
+      setShowBulkCategoryModal(false);
+      setSelectedItems([]);
+      try { toast?.success && toast.success('Category updated'); } catch {}
+    } catch (err) {
+      console.error('Bulk category change failed', err);
+      try { toast?.error && toast.error('Failed to change category'); } catch {}
+    }
+  };
+
+  // Perform bulk edit (generic fields)
+  const performBulkEdit = async () => {
+    if (!bulkEditFields || Object.keys(bulkEditFields).length === 0) return alert('No changes specified');
+    try {
+      for (const id of selectedItems) {
+        try {
+          const res = await fetch(API_ENDPOINTS.PRODUCT(id), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(bulkEditFields) });
+          if (!res.ok) {
+            const t = await res.text().catch(()=>null);
+            console.warn('Bulk edit failed for', id, t);
+          }
+        } catch (err) { console.warn('Error bulk editing', id, err); }
+      }
+      try { await (window.__inventory_fetchProducts?.()); } catch {}
+      setShowBulkEditModal(false);
+      setSelectedItems([]);
+      try { toast?.success && toast.success('Items updated'); } catch {}
+    } catch (err) {
+      console.error('Bulk edit error', err);
+      try { toast?.error && toast.error('Failed to update items'); } catch {}
+    }
   };
 
   return (
@@ -861,6 +998,99 @@ const InventoryManagement = () => {
           setShowPOModal(false);
         }}
       />
+      {/* Bulk Price Modal */}
+      {showBulkPriceModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowBulkPriceModal(false)} />
+          <div className="relative w-11/12 max-w-md bg-card border border-border rounded-lg p-4 shadow-xl z-10">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-heading font-semibold text-lg">Update Prices for {selectedItems?.length} items</h3>
+              <button className="text-sm text-muted-foreground" onClick={() => setShowBulkPriceModal(false)}>Close</button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm mb-1">Mode</label>
+                <select value={bulkPriceMode} onChange={(e) => setBulkPriceMode(e.target.value)} className="w-full input">
+                  <option value="set">Set exact price</option>
+                  <option value="percent">Increase by percentage</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm mb-1">Value {bulkPriceMode === 'percent' ? '(e.g. 10 for +10%)' : ''}</label>
+                <input type="text" value={bulkPriceValue} onChange={(e) => setBulkPriceValue(e.target.value)} className="w-full input" />
+              </div>
+              <div className="flex justify-end space-x-2">
+                <button className="btn" onClick={() => setShowBulkPriceModal(false)}>Cancel</button>
+                <button className="btn btn-primary" onClick={performBulkPriceUpdate}>Apply</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Category Modal */}
+      {showBulkCategoryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowBulkCategoryModal(false)} />
+          <div className="relative w-11/12 max-w-md bg-card border border-border rounded-lg p-4 shadow-xl z-10">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-heading font-semibold text-lg">Change Category for {selectedItems?.length} items</h3>
+              <button className="text-sm text-muted-foreground" onClick={() => setShowBulkCategoryModal(false)}>Close</button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm mb-1">Category</label>
+                <select value={bulkCategoryId} onChange={(e) => setBulkCategoryId(e.target.value)} className="w-full input">
+                  <option value="">-- Select category --</option>
+                  {categories?.map(c => (
+                    <option key={c.category_code} value={c.category_code}>{c.category_name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex justify-end space-x-2">
+                <button className="btn" onClick={() => setShowBulkCategoryModal(false)}>Cancel</button>
+                <button className="btn btn-primary" onClick={performBulkCategoryChange}>Apply</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Edit Modal */}
+      {showBulkEditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowBulkEditModal(false)} />
+          <div className="relative w-11/12 max-w-md bg-card border border-border rounded-lg p-4 shadow-xl z-10">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-heading font-semibold text-lg">Edit {selectedItems?.length} items</h3>
+              <button className="text-sm text-muted-foreground" onClick={() => setShowBulkEditModal(false)}>Close</button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm mb-1">Set Price (leave empty to skip)</label>
+                <input type="text" value={bulkEditFields.price ?? ''} onChange={(e) => setBulkEditFields(prev => ({ ...prev, price: e.target.value === '' ? undefined : Number(e.target.value) }))} className="w-full input" />
+              </div>
+              <div>
+                <label className="block text-sm mb-1">Category (leave empty to skip)</label>
+                <select value={bulkEditFields.category ?? ''} onChange={(e) => setBulkEditFields(prev => ({ ...prev, category: e.target.value || undefined }))} className="w-full input">
+                  <option value="">-- No change --</option>
+                  {categories?.map(c => (
+                    <option key={c.category_code} value={c.category_code}>{c.category_name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm mb-1">Reorder Level (leave empty to skip)</label>
+                <input type="number" value={bulkEditFields.reorderLevel ?? ''} onChange={(e) => setBulkEditFields(prev => ({ ...prev, reorderLevel: e.target.value === '' ? undefined : Number(e.target.value) }))} className="w-full input" />
+              </div>
+              <div className="flex justify-end space-x-2">
+                <button className="btn" onClick={() => setShowBulkEditModal(false)}>Cancel</button>
+                <button className="btn btn-primary" onClick={performBulkEdit}>Apply</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
