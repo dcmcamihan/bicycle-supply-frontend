@@ -204,6 +204,7 @@ const InventoryManagement = () => {
 
   // Recent movements (real data)
   const [recentMovements, setRecentMovements] = useState([]);
+  const [showMovementsModal, setShowMovementsModal] = useState(false);
 
   // Helper function to get product name
   const getProductName = async (productId) => {
@@ -691,8 +692,8 @@ const InventoryManagement = () => {
   };
 
   const handleViewMovements = () => {
-    console.log('Viewing all stock movements');
-    alert('Stock movements report would open');
+    // Open modal showing all recent stock movements
+    setShowMovementsModal(true);
   };
 
   return (
@@ -815,6 +816,35 @@ const InventoryManagement = () => {
         categories={categories}
         brands={brands}
       />
+      {/* Movements Modal (View All) */}
+      {showMovementsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowMovementsModal(false)} />
+          <div className="relative w-11/12 max-w-3xl bg-card border border-border rounded-lg p-4 shadow-xl z-10">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-heading font-semibold text-lg">All Stock Movements</h3>
+              <div className="flex items-center gap-2">
+                <button className="text-sm text-muted-foreground" onClick={() => setShowMovementsModal(false)}>Close</button>
+              </div>
+            </div>
+            <div className="max-h-96 overflow-y-auto space-y-2">
+              {recentMovements?.length === 0 ? (
+                <div className="p-4 text-center text-muted-foreground">No movements found.</div>
+              ) : (
+                recentMovements.map(m => (
+                  <div key={m.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                    <div className="min-w-0">
+                      <div className="font-medium text-sm text-foreground truncate">{m.productName}</div>
+                      <div className="text-xs text-muted-foreground">{m.type} • {new Date(m.timestamp).toLocaleString()}</div>
+                    </div>
+                    <div className={`font-semibold ${m.quantity > 0 ? 'text-success' : 'text-destructive'}`}>{m.quantity > 0 ? `+${m.quantity}` : m.quantity}</div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       {/* Create PO Modal (Low Stock Reorder) */}
       <CreatePurchaseOrderModal
         isOpen={showPOModal}

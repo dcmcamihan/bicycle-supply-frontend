@@ -37,11 +37,82 @@ const PointOfSale = () => {
   useEffect(() => {
     const fetchEmployees = async () => {
       try {
-        const res = await fetch(API_ENDPOINTS.EMPLOYEES);
-        if (!res.ok) throw new Error('Failed to fetch employees');
-        const data = await res.json();
-        setEmployees(data);
+        // Fetch employees, today's attendance, role histories and role types in parallel
+        const today = new Date().toISOString().split('T')[0];
+        const [resEmp, resAtt, resRoleHist, resRoleTypes] = await Promise.all([
+          fetch(API_ENDPOINTS.EMPLOYEES),
+          fetch(API_ENDPOINTS.EMPLOYEE_ATTENDANCES),
+          fetch(API_ENDPOINTS.EMPLOYEE_ROLE_HISTORIES),
+          fetch(API_ENDPOINTS.EMPLOYEE_ROLES)
+        ]);
+
+        const empData = resEmp.ok ? await resEmp.json() : [];
+        const attData = resAtt.ok ? await resAtt.json() : [];
+        const roleHistData = resRoleHist.ok ? await resRoleHist.json() : [];
+        const roleTypes = resRoleTypes.ok ? await resRoleTypes.json() : [];
+
+        // Build set of employee_ids who have a 'present' attendance for today
+        const presentIds = new Set();
+        try {
+          for (const a of (attData || [])) {
+            const rawDate = a.date || a.attendance_date || a.attendanceDate || null;
+            const attDate = rawDate ? String(rawDate).split('T')[0] : null;
+            if (attDate !== today) continue;
+            const status = String(a.attendance_status || a.status || '').toUpperCase();
+            if (status === '1001' || status === 'PRESENT' || status.includes('PRESENT') || status === 'P') {
+              if (a.employee_id) presentIds.add(String(a.employee_id));
+            }
+          }
+        } catch (err) {
+          // if parsing attendance failed, leave presentIds empty
+        }
+
+        // Compute current role per employee from roleHistData (pick latest date_effectivity)
+        const latestRoleByEmployee = {};
+        try {
+          for (const rh of (roleHistData || [])) {
+            const empId = String(rh.employee_id || rh.employeeId || '');
+            if (!empId) continue;
+            const eff = rh.date_effectivity || rh.dateEffectivity || rh.effective_date || null;
+            const effTs = eff ? new Date(eff).getTime() : 0;
+            if (!latestRoleByEmployee[empId] || (effTs > (latestRoleByEmployee[empId].effTs || 0))) {
+              latestRoleByEmployee[empId] = { role_type: rh.role_type || rh.roleType || rh.role, effTs };
+            }
+          }
+        } catch (err) {
+          // ignore
+        }
+
+        // Map role types for lookup
+        const roleTypeByCode = {};
+        for (const rt of (roleTypes || [])) {
+          roleTypeByCode[String(rt.role_type_code || rt.role_type || rt.code || rt.role_type)] = rt.description || rt.role_type || rt.role_type_code || '';
+        }
+
+        // Build set of employee_ids whose current role looks like 'cashier'
+        const cashierIds = new Set();
+        for (const [empId, info] of Object.entries(latestRoleByEmployee)) {
+          const code = String(info.role_type || '').toUpperCase();
+          const desc = (roleTypeByCode[code] || '').toLowerCase();
+          if (code === 'CASHIER' || desc.includes('cashier')) {
+            cashierIds.add(String(empId));
+          }
+        }
+
+        // Final filter: employee must be present today AND have cashier role. If we couldn't compute cashierIds, fall back to present-only behavior.
+        let finalEmployees = empData;
+        if (cashierIds.size > 0) {
+          finalEmployees = empData.filter(e => cashierIds.has(String(e.employee_id)) && presentIds.has(String(e.employee_id)));
+        } else if (presentIds.size > 0) {
+          finalEmployees = empData.filter(e => presentIds.has(String(e.employee_id)));
+        } else {
+          // if neither present nor cashier info is available, fallback to full list
+          finalEmployees = empData;
+        }
+
+        setEmployees(finalEmployees || []);
       } catch (err) {
+        console.warn('Failed to fetch employees/attendance/roles, falling back to empty list', err);
         setEmployees([]);
       }
     };

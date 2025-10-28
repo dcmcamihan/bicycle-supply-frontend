@@ -10,9 +10,12 @@ const AttendanceManagement = () => {
   const [attendance, setAttendance] = useState([]);
   const [loading, setLoading] = useState(false);
   const [statuses, setStatuses] = useState([]);
+  const [attendanceStatuses, setAttendanceStatuses] = useState([]); // ATTNSTAT
+  const [emplStatuses, setEmplStatuses] = useState([]); // EMPLSTAT
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const toast = useToast();
+  
 
   // Form state
   const [formData, setFormData] = useState({
@@ -20,7 +23,8 @@ const AttendanceManagement = () => {
     attendance_date: new Date().toISOString().split('T')[0],
     time_in: '',
     time_out: '',
-    status: 'PRESENT'
+    // default to the numeric code for Present so the select has a matching value
+    status: '1001'
   });
 
   // Fetch employees and attendance
@@ -33,18 +37,20 @@ const AttendanceManagement = () => {
         const empData = await empResponse.json();
         setEmployees(empData);
 
-        // Fetch all statuses (more reliable than assuming a specific reference exists)
+        // Fetch attendance statuses (ATTNSTAT) and employee statuses (EMPLSTAT)
         try {
-          const allRes = await fetch(API_ENDPOINTS.STATUSES);
-          if (allRes.ok) {
-            const allData = await allRes.json();
-            setStatuses(allData || []);
-          } else {
-            setStatuses([]);
-          }
+          const [attRes, empRes] = await Promise.all([
+            fetch(API_ENDPOINTS.STATUSES_BY_REFERENCE('ATTNSTAT')),
+            fetch(API_ENDPOINTS.STATUSES_BY_REFERENCE('EMPLSTAT'))
+          ]);
+          const attData = attRes.ok ? await attRes.json() : [];
+          const empData = empRes.ok ? await empRes.json() : [];
+          setAttendanceStatuses(attData || []);
+          setEmplStatuses(empData || []);
         } catch (err) {
-          console.warn('Failed to load statuses', err);
-          setStatuses([]);
+          console.warn('Failed to load status references', err);
+          setAttendanceStatuses([]);
+          setEmplStatuses([]);
         }
 
         // Fetch attendance for selected date
@@ -132,6 +138,52 @@ const AttendanceManagement = () => {
     return 'bg-gray-100 text-gray-800';
   };
 
+  // Attendance and employee status helpers
+  const getAttendanceLabel = (code) => {
+    if (!code) return '';
+    const s = (attendanceStatuses || []).find(st => String(st.status_code) === String(code));
+    if (s) return s.description;
+    return getStatusLabel(code);
+  };
+
+  const getEmployeeStatusLabel = (code) => {
+    if (!code) return '';
+    const s = (emplStatuses || []).find(st => String(st.status_code) === String(code));
+    if (s) return s.description;
+    return code || '';
+  };
+
+  const attendanceColorByCode = {
+    '1001': 'bg-green-100 text-green-800', // Present
+    '1002': 'bg-red-100 text-red-800', // Leave of Absence
+    '1003': 'bg-red-50 text-red-700', // Suspended
+    '1004': 'bg-yellow-100 text-yellow-800', // Furloughed
+    '1005': 'bg-amber-100 text-amber-800', // Medical Leave
+    '1006': 'bg-teal-100 text-teal-800' // Parental Leave
+  };
+
+  const attendanceStatusColor = (codeOrLabel) => {
+    const code = String(codeOrLabel || '');
+    if (attendanceColorByCode[code]) return attendanceColorByCode[code];
+    const label = String(getAttendanceLabel(codeOrLabel)).toLowerCase();
+    if (label.includes('present')) return 'bg-green-100 text-green-800';
+    if (label.includes('leave') || label.includes('absence')) return 'bg-red-100 text-red-800';
+    if (label.includes('suspend')) return 'bg-red-50 text-red-700';
+    if (label.includes('furlough')) return 'bg-yellow-100 text-yellow-800';
+    if (label.includes('medical')) return 'bg-amber-100 text-amber-800';
+    if (label.includes('parent')) return 'bg-teal-100 text-teal-800';
+    return 'bg-gray-100 text-gray-800';
+  };
+
+  // Helper: consider a status 'present' when code matches 1001 or its label contains 'present'
+  const isAttendancePresent = (status) => {
+    if (!status) return false;
+    const s = String(status);
+    if (s === '1001') return true;
+    const label = String(getAttendanceLabel(status)).toLowerCase();
+    return label.includes('present');
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -152,14 +204,16 @@ const AttendanceManagement = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to save attendance');
+        const text = await response.text().catch(()=>null);
+        console.error('Attendance save failed response:', response.status, response.statusText, text);
+        throw new Error(text || 'Failed to save attendance');
       }
 
       const saved = await response.json();
       const attendanceId = saved.attendance_id;
 
-      // If the status is not ABSENT, attempt to save attendance details (time_in/time_out)
-      if (formData.status !== 'ABSENT') {
+      // If the status is present, attempt to save attendance details (time_in/time_out)
+      if (isAttendancePresent(formData.status)) {
         // Require both time_in and time_out when saving details since DB expects TIME not null
         if (!formData.time_in || !formData.time_out) {
           // If missing time_out, default to time_in to avoid DB NOT NULL issues
@@ -188,7 +242,7 @@ const AttendanceManagement = () => {
         attendance_date: formData.attendance_date,
         time_in: '',
         time_out: '',
-        status: 'PRESENT'
+        status: '1001'
       });
 
       toast?.success('Attendance recorded successfully');
@@ -261,16 +315,18 @@ const AttendanceManagement = () => {
                     className="w-full p-2 border rounded"
                     required
                   >
-                    {statuses && statuses.length > 0 ? (
-                      statuses.map(s => (
+                    {attendanceStatuses && attendanceStatuses.length > 0 ? (
+                      attendanceStatuses.map(s => (
                         <option key={s.status_code} value={s.status_code}>{s.description}</option>
                       ))
                     ) : (
                       <>
-                        <option value="PRESENT">Present</option>
-                        <option value="ABSENT">Absent</option>
-                        <option value="LATE">Late</option>
-                        <option value="HALF_DAY">Half Day</option>
+                        <option value="1001">Present</option>
+                        <option value="1002">Leave of Absence</option>
+                        <option value="1003">Suspended</option>
+                        <option value="1004">Furloughed</option>
+                        <option value="1005">Medical Leave</option>
+                        <option value="1006">Parental Leave</option>
                       </>
                     )}
                   </select>
@@ -283,8 +339,8 @@ const AttendanceManagement = () => {
                     value={formData.time_in}
                     onChange={(e) => setFormData({...formData, time_in: e.target.value})}
                     className="w-full p-2 border rounded"
-                    required={formData.status !== 'ABSENT'}
-                    disabled={formData.status === 'ABSENT'}
+                    required={isAttendancePresent(formData.status)}
+                    disabled={!isAttendancePresent(formData.status)}
                   />
                 </div>
 
@@ -295,8 +351,8 @@ const AttendanceManagement = () => {
                     value={formData.time_out}
                     onChange={(e) => setFormData({...formData, time_out: e.target.value})}
                     className="w-full p-2 border rounded"
-                    required={formData.status !== 'ABSENT'}
-                    disabled={formData.status === 'ABSENT'}
+                    required={isAttendancePresent(formData.status)}
+                    disabled={!isAttendancePresent(formData.status)}
                   />
                 </div>
               </div>
@@ -328,13 +384,13 @@ const AttendanceManagement = () => {
                               {employee ? `${employee.first_name} ${employee.last_name}` : `Employee #${record.employee_id}`}
                             </h3>
                             <div className="text-sm text-muted-foreground mt-1">
-                              <p>Status: {record.status}</p>
+                              <p>Employee Status: {employee ? getEmployeeStatusLabel(employee.employee_status) : ''}</p>
                               <p>Time In: {record.time_in ? record.time_in : '—'}</p>
                               <p>Time Out: {record.time_out ? record.time_out : '—'}</p>
                             </div>
                           </div>
-                          <div className={`px-3 py-1 rounded text-sm ${statusColorClass(record.status)}`}>
-                            {getStatusLabel(record.status)}
+                          <div className={`px-3 py-1 rounded text-sm ${attendanceStatusColor(record.status)}`}>
+                            {getAttendanceLabel(record.status)}
                           </div>
                         </div>
                       </div>
