@@ -57,7 +57,15 @@ const LoginForm = () => {
       if (formData.rememberMe) localStorage.setItem('rememberMe', 'true');
       navigate('/dashboard');
     } catch (e) {
-      setErrors({ general: e?.message || 'Login failed' });
+      let details = '';
+      if (e?.response) {
+        details = JSON.stringify(e.response.data, null, 2);
+      } else if (e?.message) {
+        details = e.message;
+      } else if (typeof e === 'string') {
+        details = e;
+      }
+      setErrors({ general: e?.message || 'Login failed', details });
     } finally {
       setIsLoading(false);
     }
@@ -76,9 +84,9 @@ const LoginForm = () => {
             <Icon name="AlertCircle" size={20} className="text-red-600 flex-shrink-0" />
             <div>
               <p className="text-red-800 font-body text-sm">{errors?.general}</p>
-              <p className="text-red-600 font-caption text-xs mt-1">
-                Demo credentials: admin@bikeshoppro.com / BikeShop2025!
-              </p>
+              {errors?.details && (
+                <pre className="text-red-600 font-caption text-xs mt-1 whitespace-pre-wrap">{errors.details}</pre>
+              )}
             </div>
           </div>
         )}
