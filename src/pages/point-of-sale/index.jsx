@@ -355,7 +355,7 @@ const PointOfSale = () => {
             quantity_sold: item.quantity
           };
           console.log('POST /api/sale-details payload:', saleDetailPayload);
-          const saleDetailsRes = await fetch('http://localhost:3000/api/sale-details', {
+          const saleDetailsRes = await fetch(API_ENDPOINTS.SALE_DETAILS_BASE, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(saleDetailPayload)
