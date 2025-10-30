@@ -13,9 +13,9 @@ export default defineConfig({
   },
   plugins: [tsconfigPaths(), react(), tagger()],
   server: {
-    port: process.env.VITE_PORT ? Number(process.env.VITE_PORT) : 4028,
-    host: "0.0.0.0",
-    strictPort: true,
-    allowedHosts: ["all"]
+  port: "4028",
+  host: "0.0.0.0",
+  strictPort: true,
+  allowedHosts: ["all"]
   }
 });
