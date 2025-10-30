@@ -317,6 +317,8 @@ const PointOfSale = () => {
           return;
         }
       }
+      // If still no customer, use default customer id 1
+      if (!customerIdToUse) customerIdToUse = 1;
 
       // 1. POST Sale
       const salePayload = {
