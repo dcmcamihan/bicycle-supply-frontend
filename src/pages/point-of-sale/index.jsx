@@ -128,6 +128,7 @@ const PointOfSale = () => {
   const [cashierId, setCashierId] = useState('');
   const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
   const [lastTransaction, setLastTransaction] = useState(null);
+  const [discountAmount, setDiscountAmount] = useState(0);
 
   // Products fetched from API
   const [products, setProducts] = useState([]);
@@ -407,12 +408,16 @@ const PointOfSale = () => {
         ...paymentData,
         items: [...cartItems],
         customer: selectedCustomer || (customerName ? { name: customerName } : null),
-        transactionId
+        transactionId,
+        subtotal,
+        discountAmount: discountValue,
+        total: cartTotal
       });
       setShowPaymentSuccess(true);
       setCartItems([]);
       setSelectedCustomer(null);
       setCustomerName('');
+      setDiscountAmount(0);
     })();
   };
 
@@ -425,7 +430,9 @@ const PointOfSale = () => {
     window.print();
   };
 
-  const cartTotal = cartItems?.reduce((sum, item) => sum + (item?.price * item?.quantity), 0);
+  const subtotal = cartItems?.reduce((sum, item) => sum + (item?.price * item?.quantity), 0);
+  const discountValue = Math.min(parseFloat(discountAmount) || 0, subtotal);
+  const cartTotal = Math.max(0, subtotal - discountValue);
 
   return (
     <>
@@ -515,8 +522,11 @@ const PointOfSale = () => {
                           ))}
                         </div>
                         <div className="border-t border-border pt-2 mt-2">
-                          <div className="flex justify-between"><span>Subtotal</span><span>{new Intl.NumberFormat('en-PH',{style:'currency',currency:'PHP'}).format(lastTransaction?.items?.reduce((s,i)=>s + ((i.price||0)*(i.quantity||0)),0) || 0)}</span></div>
-                          <div className="flex justify-between"><span>Total</span><span className="font-heading font-bold">{new Intl.NumberFormat('en-PH',{style:'currency',currency:'PHP'}).format(lastTransaction?.amount || 0)}</span></div>
+                          <div className="flex justify-between"><span>Subtotal</span><span>{new Intl.NumberFormat('en-PH',{style:'currency',currency:'PHP'}).format(lastTransaction?.subtotal || 0)}</span></div>
+                          {lastTransaction?.discountAmount > 0 && (
+                            <div className="flex justify-between text-success"><span>Discount</span><span>-{new Intl.NumberFormat('en-PH',{style:'currency',currency:'PHP'}).format(lastTransaction?.discountAmount)}</span></div>
+                          )}
+                          <div className="flex justify-between font-heading font-bold"><span>Total</span><span>{new Intl.NumberFormat('en-PH',{style:'currency',currency:'PHP'}).format(lastTransaction?.total || lastTransaction?.amount || 0)}</span></div>
                           <div className="flex justify-between"><span>Amount Tendered</span><span>{new Intl.NumberFormat('en-PH',{style:'currency',currency:'PHP'}).format(lastTransaction?.amountTendered ?? lastTransaction?.amount ?? 0)}</span></div>
                           <div className="flex justify-between"><span>Change</span><span>{new Intl.NumberFormat('en-PH',{style:'currency',currency:'PHP'}).format(lastTransaction?.change ?? 0)}</span></div>
                         </div>
@@ -603,6 +613,8 @@ const PointOfSale = () => {
                       onUpdateQuantity={handleUpdateQuantity}
                       onRemoveItem={handleRemoveItem}
                       onClearCart={handleClearCart}
+                      discount={discountAmount}
+                      onDiscountChange={setDiscountAmount}
                     />
                   </div>
 

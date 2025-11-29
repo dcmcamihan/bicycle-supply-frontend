@@ -3,7 +3,7 @@ import Icon from '../../../components/AppIcon';
 import Image from '../../../components/AppImage';
 import Button from '../../../components/ui/Button';
 
-const ShoppingCart = ({ cartItems, onUpdateQuantity, onRemoveItem, onClearCart }) => {
+const ShoppingCart = ({ cartItems, onUpdateQuantity, onRemoveItem, onClearCart, discount = 0, onDiscountChange }) => {
   const formatPrice = (price) => {
     return new Intl.NumberFormat('en-PH', {
       style: 'currency',
@@ -12,7 +12,8 @@ const ShoppingCart = ({ cartItems, onUpdateQuantity, onRemoveItem, onClearCart }
   };
 
   const subtotal = cartItems?.reduce((sum, item) => sum + (item?.price * item?.quantity), 0);
-  const total = subtotal;
+  const discountValue = Math.min(parseFloat(discount) || 0, subtotal);
+  const total = Math.max(0, subtotal - discountValue);
 
   return (
     <div className="bg-card border border-border rounded-lg shadow-subtle h-full flex flex-col">
@@ -116,10 +117,29 @@ const ShoppingCart = ({ cartItems, onUpdateQuantity, onRemoveItem, onClearCart }
       </div>
       {cartItems?.length > 0 && (
         <div className="p-4 border-t border-border bg-muted">
-          <div className="space-y-2">
+          <div className="space-y-3">
             <div className="flex justify-between font-body text-sm">
               <span className="text-muted-foreground">Subtotal:</span>
               <span className="text-foreground">{formatPrice(subtotal)}</span>
+            </div>
+            
+            <div className="space-y-1">
+              <label className="font-caption text-xs text-muted-foreground block">Discount (Optional):</label>
+              <input
+                type="number"
+                min="0"
+                max={subtotal}
+                step="0.01"
+                value={discount}
+                onChange={(e) => onDiscountChange && onDiscountChange(parseFloat(e.target.value) || 0)}
+                placeholder="0.00"
+                className="w-full px-2 py-1 bg-background border border-border rounded text-sm text-foreground font-data"
+              />
+              {discountValue > 0 && (
+                <p className="text-xs text-success">
+                  Discount: -{formatPrice(discountValue)}
+                </p>
+              )}
             </div>
             
             <div className="flex justify-between font-heading font-bold text-lg border-t border-border pt-2">
