@@ -1,10 +1,10 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
-import LoginHeader from './components/LoginHeader';
+import { motion } from 'framer-motion';
+import { Bike, ArrowRight } from 'lucide-react';
 import LoginForm from './components/LoginForm';
-import SecurityBadges from './components/SecurityBadges';
-import LoginBackground from './components/LoginBackground';
+import LiquidBackground from '../../components/shared/LiquidBackground';
 import { useAuth } from '../../contexts/AuthContext';
 
 const LoginPage = () => {
@@ -16,28 +16,74 @@ const LoginPage = () => {
     if (user) navigate('/dashboard', { replace: true });
   }, [navigate, user]);
 
+  const goHome = () => {
+    navigate('/');
+  };
+
   return (
     <>
       <Helmet>
-        <title>Sign In - Jolens BikeShop</title>
-        <meta name="description" content="Sign in to Jolens BikeShop retail management system. Access inventory management, point of sale, and business analytics for your bicycle shop." />
+        <title>Sign In - Jolens Bicycle Supply</title>
+        <meta name="description" content="Sign in to Jolens Bicycle Supply management system. Access inventory, sales, and business analytics." />
         <meta name="keywords" content="bicycle shop, retail management, inventory, point of sale, login" />
       </Helmet>
 
-      <div className="min-h-screen bg-background flex">
-        {/* Left Side - Login Form */}
-        <div className="flex-1 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 lg:flex-none lg:w-96 xl:w-[480px]">
-          <div className="mx-auto w-full max-w-md lg:max-w-sm xl:max-w-md">
-            <LoginHeader />
-            <div className="bg-card rounded-2xl shadow-raised border border-border p-8">
-              <LoginForm />
-            </div>
-            <SecurityBadges />
-          </div>
-        </div>
+      <div className="relative min-h-screen w-full overflow-hidden text-gray-100 font-sans selection:bg-emerald-500/30">
+        <LiquidBackground />
 
-        {/* Right Side - Background Image (Desktop Only) */}
-        <LoginBackground />
+        {/* Top Navigation */}
+        <nav className="fixed top-0 z-50 w-full px-6 py-4">
+          <div className="mx-auto max-w-7xl flex items-center justify-between rounded-full border border-white/10 bg-gray-900/50 px-6 py-3 backdrop-blur-xl shadow-lg">
+            <button onClick={goHome} className="flex items-center gap-2 hover:opacity-80 transition">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-black">
+                <Bike size={20} strokeWidth={2.5} />
+              </div>
+              <span className="text-lg font-bold tracking-tight text-white">
+                Jolens<span className="text-emerald-400">.</span>
+              </span>
+            </button>
+            <button 
+              onClick={goHome}
+              className="flex items-center gap-2 text-sm font-medium text-gray-400 hover:text-white transition"
+            >
+              Back to Home <ArrowRight size={14} />
+            </button>
+          </div>
+        </nav>
+
+        {/* Main Content */}
+        <div className="flex items-center justify-center min-h-screen pt-24 pb-12 px-4">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="w-full max-w-md"
+          >
+            {/* Header */}
+            <div className="text-center mb-8">
+              <h1 className="text-4xl font-bold text-white mb-3">Welcome Back</h1>
+              <p className="text-gray-400 text-lg">Sign in to your Jolen's account</p>
+            </div>
+
+            {/* Login Card */}
+            <div className="relative rounded-3xl bg-gradient-to-br from-slate-800/80 via-slate-800/60 to-slate-900/80 border border-emerald-500/20 backdrop-blur-sm shadow-2xl p-8">
+              {/* Decorative gradient */}
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 bg-emerald-500/20 rounded-full blur-3xl"></div>
+              
+              <div className="relative z-10">
+                <LoginForm />
+              </div>
+            </div>
+
+            {/* Footer Text */}
+            <p className="text-center text-gray-400 text-sm mt-6">
+              Don't have an account?{' '}
+              <a href="#" className="text-emerald-400 hover:text-emerald-300 font-medium transition">
+                Contact support
+              </a>
+            </p>
+          </motion.div>
+        </div>
       </div>
     </>
   );

@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { AlertCircle, Eye, EyeOff } from 'lucide-react';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import { Checkbox } from '../../../components/ui/Checkbox';
@@ -12,6 +14,7 @@ const LoginForm = () => {
   const [formData, setFormData] = useState({ username: '', password: '', rememberMe: false });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e?.target;
@@ -76,51 +79,98 @@ const LoginForm = () => {
   };
 
   return (
-    <div className="w-full max-w-md mx-auto">
+    <div className="w-full space-y-6">
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* General Error Message */}
         {errors?.general && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center space-x-3">
-            <Icon name="AlertCircle" size={20} className="text-red-600 flex-shrink-0" />
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex items-start gap-3 backdrop-blur-sm"
+          >
+            <AlertCircle size={20} className="text-red-400 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-red-800 font-body text-sm">{errors?.general}</p>
+              <p className="text-red-300 font-medium text-sm">{errors?.general}</p>
               {errors?.details && (
-                <pre className="text-red-600 font-caption text-xs mt-1 whitespace-pre-wrap">{errors.details}</pre>
+                <pre className="text-red-400/70 font-mono text-xs mt-2 whitespace-pre-wrap break-words max-h-24 overflow-y-auto">{errors.details}</pre>
               )}
             </div>
-          </div>
+          </motion.div>
         )}
 
         {/* Username Field */}
-        <Input
-          label="Username"
-          type="text"
-          name="username"
-          placeholder="Enter your username"
-          value={formData?.username}
-          onChange={handleInputChange}
-          error={errors?.username}
-          required
-          disabled={isLoading}
-          className="w-full"
-        />
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <label className="block text-sm font-medium text-gray-300 mb-2">Username</label>
+          <div className="relative">
+            <input
+              type="text"
+              name="username"
+              placeholder="Enter your username"
+              value={formData?.username}
+              onChange={handleInputChange}
+              disabled={isLoading}
+              className={`w-full px-4 py-3 rounded-lg bg-white/5 border ${
+                errors?.username 
+                  ? 'border-red-500/50' 
+                  : 'border-emerald-500/20 hover:border-emerald-500/40'
+              } text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 transition-all duration-200 backdrop-blur-sm`}
+            />
+          </div>
+          {errors?.username && (
+            <p className="text-red-400 text-xs mt-1">{errors?.username}</p>
+          )}
+        </motion.div>
 
         {/* Password Field */}
-        <Input
-          label="Password"
-          type="password"
-          name="password"
-          placeholder="Enter your password"
-          value={formData?.password}
-          onChange={handleInputChange}
-          error={errors?.password}
-          required
-          disabled={isLoading}
-          className="w-full"
-        />
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <label className="block text-sm font-medium text-gray-300 mb-2">Password</label>
+          <div className="relative">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              name="password"
+              placeholder="Enter your password"
+              value={formData?.password}
+              onChange={handleInputChange}
+              disabled={isLoading}
+              className={`w-full px-4 py-3 rounded-lg bg-white/5 border ${
+                errors?.password 
+                  ? 'border-red-500/50' 
+                  : 'border-emerald-500/20 hover:border-emerald-500/40'
+              } text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 transition-all duration-200 backdrop-blur-sm pr-11`}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              disabled={isLoading}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300 transition"
+            >
+              {showPassword ? (
+                <EyeOff size={18} />
+              ) : (
+                <Eye size={18} />
+              )}
+            </button>
+          </div>
+          {errors?.password && (
+            <p className="text-red-400 text-xs mt-1">{errors?.password}</p>
+          )}
+        </motion.div>
 
-        {/* Remember Me Checkbox */}
-        <div className="flex items-center justify-between">
+        {/* Remember Me & Forgot Password */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="flex items-center justify-between"
+        >
           <Checkbox
             label="Remember me"
             name="rememberMe"
@@ -133,29 +183,34 @@ const LoginForm = () => {
           <button
             type="button"
             onClick={handleForgotPassword}
-            className="font-body text-sm text-primary hover:text-primary/80 transition-micro focus:outline-none focus:underline"
+            className="text-sm text-emerald-400 hover:text-emerald-300 transition-colors focus:outline-none"
             disabled={isLoading}
           >
             Forgot password?
           </button>
-        </div>
+        </motion.div>
 
         {/* Sign In Button */}
-        <Button
-          type="submit"
-          variant="default"
-          size="lg"
-          fullWidth
-          loading={isLoading}
-          disabled={isLoading}
-          iconName="LogIn"
-          iconPosition="right"
-          className="mt-8"
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
         >
-          {isLoading ? 'Signing In...' : 'Sign In'}
-        </Button>
-
-        
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full px-4 py-3 rounded-lg bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-medium hover:from-emerald-600 hover:to-emerald-700 disabled:from-gray-600 disabled:to-gray-700 transition-all duration-200 shadow-lg hover:shadow-emerald-500/50 disabled:shadow-none flex items-center justify-center gap-2"
+          >
+            {isLoading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                Signing In...
+              </>
+            ) : (
+              'Sign In'
+            )}
+          </button>
+        </motion.div>
       </form>
     </div>
   );

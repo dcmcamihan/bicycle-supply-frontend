@@ -12,6 +12,7 @@ import EmployeeManagement from './pages/management/employees';
 import AttendanceManagement from './pages/management/attendance';
 import LoginPage from './pages/login';
 import SignupPage from './pages/signup';
+import LandingPage from './pages/landing';
 import ForgotPassword from './pages/auth/ForgotPassword';
 import ResetPassword from './pages/auth/ResetPassword';
 import ProductDetails from './pages/product-details';
@@ -32,6 +33,11 @@ const PrivateRoute = ({ element }) => {
   return user ? element : <LoginPage />;
 };
 
+const PublicRoute = ({ element }) => {
+  const { user } = useAuth();
+  return !user ? element : <LoginPage />;
+};
+
 const Routes = () => {
   return (
     <BrowserRouter>
@@ -41,12 +47,12 @@ const Routes = () => {
         <ToastProvider>
         <RouterRoutes>
           {/* Public */}
+          <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           {/* Private */}
-          <Route path="/" element={<PrivateRoute element={<Dashboard />} />} />
           <Route path="/dashboard" element={<PrivateRoute element={<Dashboard />} />} />
           <Route path="/inventory-management" element={<PrivateRoute element={<InventoryManagement />} />} />
           <Route path="/product-details" element={<PrivateRoute element={<ProductDetails />} />} />
