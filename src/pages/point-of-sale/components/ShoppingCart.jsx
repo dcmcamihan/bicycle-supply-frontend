@@ -12,7 +12,8 @@ const ShoppingCart = ({ cartItems, onUpdateQuantity, onRemoveItem, onClearCart, 
   };
 
   const subtotal = cartItems?.reduce((sum, item) => sum + (item?.price * item?.quantity), 0);
-  const discountValue = Math.min(parseFloat(discount) || 0, subtotal);
+  const discountPercentage = Math.min(Math.max(parseFloat(discount) || 0, 0), 100); // Clamp 0-100
+  const discountValue = (subtotal * discountPercentage) / 100;
   const total = Math.max(0, subtotal - discountValue);
 
   return (
@@ -124,20 +125,20 @@ const ShoppingCart = ({ cartItems, onUpdateQuantity, onRemoveItem, onClearCart, 
             </div>
             
             <div className="space-y-1">
-              <label className="font-caption text-xs text-muted-foreground block">Discount (Optional):</label>
+              <label className="font-caption text-xs text-muted-foreground block">Discount (Optional) %:</label>
               <input
                 type="number"
                 min="0"
-                max={subtotal}
-                step="0.01"
-                value={discount}
+                max="100"
+                step="0.1"
+                value={discount || ''}
                 onChange={(e) => onDiscountChange && onDiscountChange(parseFloat(e.target.value) || 0)}
-                placeholder="0.00"
+                placeholder="0"
                 className="w-full px-2 py-1 bg-background border border-border rounded text-sm text-foreground font-data"
               />
               {discountValue > 0 && (
                 <p className="text-xs text-success">
-                  Discount: -{formatPrice(discountValue)}
+                  {discount}% off: -{formatPrice(discountValue)}
                 </p>
               )}
             </div>

@@ -431,7 +431,8 @@ const PointOfSale = () => {
   };
 
   const subtotal = cartItems?.reduce((sum, item) => sum + (item?.price * item?.quantity), 0);
-  const discountValue = Math.min(parseFloat(discountAmount) || 0, subtotal);
+  const discountPercentage = Math.min(Math.max(parseFloat(discountAmount) || 0, 0), 100); // Clamp between 0-100%
+  const discountValue = (subtotal * discountPercentage) / 100;
   const cartTotal = Math.max(0, subtotal - discountValue);
 
   return (
