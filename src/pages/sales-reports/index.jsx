@@ -560,13 +560,13 @@ const SalesReports = () => {
     fetchSalesChartData();
   }, [dateRange, chartTimeframe]);
 
-  // Mock category data
-  const categoryData = [
+  // Category data state - will be updated by CategoryChart component
+  const [categoryData, setCategoryData] = useState([
     { name: 'Mountain Bikes', value: 45200, percentage: 35.2, color: '#2D5A27' },
     { name: 'Road Bikes', value: 38900, percentage: 30.3, color: '#4A7C59' },
     { name: 'Electric Bikes', value: 28500, percentage: 22.2, color: '#E67E22' },
     { name: 'Accessories', value: 15800, percentage: 12.3, color: '#27AE60' }
-  ];
+  ]);
 
   // Transactions data from API
   const [transactionsData, setTransactionsData] = useState([]);
@@ -1158,6 +1158,7 @@ const SalesReports = () => {
               data={categoryData} 
               title="Category Performance"
               dateRange={dateRange}
+              onDataUpdate={setCategoryData}
             />
           </div>
 

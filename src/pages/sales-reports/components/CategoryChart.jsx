@@ -19,7 +19,7 @@ const EXTENDED_COLORS = [
   '#f43f5e', '#3b82f6', '#fbbf24', '#34d399', '#7c3aed', '#38bdf8', '#d946ef', '#f87171'
 ];
 
-const CategoryChart = ({ data, title = "Category Performance", dateRange }) => {
+const CategoryChart = ({ data, title = "Category Performance", dateRange, onDataUpdate }) => {
   const [viewType, setViewType] = useState('pie');
   const [categoryData, setCategoryData] = useState([]);
 
@@ -143,9 +143,16 @@ const CategoryChart = ({ data, title = "Category Performance", dateRange }) => {
         // Sort by value desc for a clearer bar chart
         categories = categories.sort((a, b) => b.value - a.value);
         setCategoryData(categories);
+        // Call parent callback to sync data for PDF export
+        if (onDataUpdate) {
+          onDataUpdate(categories);
+        }
       } catch (err) {
         // fallback to empty or mock data
         setCategoryData([]);
+        if (onDataUpdate) {
+          onDataUpdate([]);
+        }
       }
     };
     fetchCategoryPerformance();
