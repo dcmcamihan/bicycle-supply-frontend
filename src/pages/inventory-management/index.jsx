@@ -925,6 +925,8 @@ const InventoryManagement = () => {
                   onFilterChange={handleFilterChange}
                   onClearFilters={handleClearFilters}
                   suppliers={mockSuppliers}
+                  categories={categories}
+                  brands={brands}
                 />
 
                 {/* Bulk Actions */}

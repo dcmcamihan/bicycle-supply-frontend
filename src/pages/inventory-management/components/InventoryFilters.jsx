@@ -3,56 +3,43 @@ import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
+import API_ENDPOINTS from '../../../config/api';
 
 const InventoryFilters = ({ 
   filters, 
   onFilterChange, 
   onClearFilters,
-  suppliers = []
+  suppliers = [],
+  categories = [],
+  brands = []
 }) => {
-  const [categoryOptions, setCategoryOptions] = React.useState([
-    { value: '', label: 'All Categories' }
-  ]);
+  const [categoryOptions, setCategoryOptions] = React.useState([]);
 
   React.useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const response = await fetch('http://localhost:3000/api/categories');
-        if (!response.ok) throw new Error('Failed to fetch categories');
-        const data = await response.json();
-        const options = Array.isArray(data)
-          ? data.map(cat => ({ value: cat.category_code || '', label: cat.category_name || '' }))
-          : [];
-        setCategoryOptions([{ value: '', label: 'All Categories' }, ...options]);
-      } catch (error) {
-        console.error('Error fetching categories:', error);
-        setCategoryOptions([{ value: '', label: 'All Categories' }]);
-      }
-    };
-    fetchCategories();
-  }, []);
+    if (Array.isArray(categories) && categories.length > 0) {
+      const options = categories.map(cat => ({
+        value: cat.category_code || '',
+        label: cat.category_name || ''
+      }));
+      setCategoryOptions([{ value: '', label: 'All Categories' }, ...options]);
+    } else {
+      setCategoryOptions([{ value: '', label: 'All Categories' }]);
+    }
+  }, [categories]);
 
-  const [brandOptions, setBrandOptions] = React.useState([
-    { value: '', label: 'All Brands' }
-  ]);
+  const [brandOptions, setBrandOptions] = React.useState([]);
 
   React.useEffect(() => {
-    const fetchBrands = async () => {
-      try {
-        const response = await fetch('http://localhost:3000/api/brands');
-        if (!response.ok) throw new Error('Failed to fetch brands');
-        const data = await response.json();
-        const options = Array.isArray(data)
-          ? data.map(brand => ({ value: String(brand.brand_id), label: brand.brand_name || '' }))
-          : [];
-        setBrandOptions([{ value: '', label: 'All Brands' }, ...options]);
-      } catch (error) {
-        console.error('Error fetching brands:', error);
-        setBrandOptions([{ value: '', label: 'All Brands' }]);
-      }
-    };
-    fetchBrands();
-  }, []);
+    if (Array.isArray(brands) && brands.length > 0) {
+      const options = brands.map(brand => ({
+        value: String(brand.brand_id),
+        label: brand.brand_name || ''
+      }));
+      setBrandOptions([{ value: '', label: 'All Brands' }, ...options]);
+    } else {
+      setBrandOptions([{ value: '', label: 'All Brands' }]);
+    }
+  }, [brands]);
 
   const stockStatusOptions = [
     { value: '', label: 'All Stock Status' },

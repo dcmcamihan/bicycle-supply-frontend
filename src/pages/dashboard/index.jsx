@@ -140,8 +140,8 @@ const Dashboard = () => {
   return (
     <>
       <Helmet>
-        <title>Dashboard - Jolens BikeShop</title>
-        <meta name="description" content="Jolens BikeShop dashboard with real-time business insights, sales metrics, and inventory management tools for bicycle shop operations." />
+        <title>Dashboard - Jolen's Bicycle Supply</title>
+        <meta name="description" content="Jolen's Bicycle Supply dashboard with real-time business insights, sales metrics, and inventory management tools for bicycle shop operations." />
       </Helmet>
       <div className="min-h-screen bg-background">
         <Header onSidebarToggle={handleSidebarToggle} user={user} />
@@ -240,7 +240,7 @@ const Dashboard = () => {
                     <Icon name="Bike" size={20} color="white" />
                   </div>
                   <div>
-                    <p className="font-body font-semibold text-foreground">Jolens BikeShop</p>
+                    <p className="font-body font-semibold text-foreground">Jolen's Bicycle Supply</p>
                     <p className="font-caption text-xs text-muted-foreground">
                       Streamlining bicycle retail operations
                     </p>
@@ -257,7 +257,7 @@ const Dashboard = () => {
                     <span className="font-caption">Connected</span>
                   </div>
                   <div className="font-caption">
-                    © {new Date()?.getFullYear()} Jolens BikeShop. All rights reserved.
+                    © {new Date()?.getFullYear()} Jolen's Bicycle Supply. All rights reserved.
                   </div>
                 </div>
               </div>
