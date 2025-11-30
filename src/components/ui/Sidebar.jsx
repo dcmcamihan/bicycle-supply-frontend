@@ -150,7 +150,7 @@ const Sidebar = ({ isCollapsed = false, onToggle }) => {
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
               <Icon name="Bike" size={20} color="white" />
             </div>
-            <h2 className="font-heading font-bold text-lg text-foreground">Jolens BikeShop</h2>
+            <h2 className="font-heading font-bold text-lg text-foreground">Jolen's Bicycle Supply</h2>
           </div>
         )}
         

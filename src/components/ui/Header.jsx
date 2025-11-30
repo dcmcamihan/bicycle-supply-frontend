@@ -198,7 +198,7 @@ const Header = ({ onSidebarToggle, user = null }) => {
               <Icon name="Bike" size={20} color="white" />
             </div>
             <div className="hidden sm:block">
-              <h1 className="font-heading font-bold text-lg text-foreground">Jolens BikeShop</h1>
+              <h1 className="font-heading font-bold text-lg text-foreground">Jolen's Bicycle Supply</h1>
             </div>
           </Link>
         </div>
