@@ -99,7 +99,7 @@ const InventoryManagement = () => {
         rawProducts.map(async item => {
           let quantityOnHand = 0;
           try {
-      const qtyRes = await fetch(`${API_ENDPOINTS.PRODUCT(item.product_id)}/quantity-on-hand`);
+            const qtyRes = await fetch(`${API_ENDPOINTS.PRODUCT(item.product_id)}/quantity-on-hand`);
             const qty = await qtyRes.json();
             quantityOnHand = Number(qty);
           } catch (err) {
