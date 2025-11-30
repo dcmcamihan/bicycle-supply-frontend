@@ -117,6 +117,8 @@ const InventoryManagement = () => {
             const brandObj = brands.find(b => String(b.brand_id) === String(item.brand_id));
             if (brandObj) brandName = brandObj.brand_name;
           }
+          // Get supplier_id from product supplier map
+          const supplierId = productSupplierMap?.get(item.product_id);
 
           return {
             id: item.product_id,
@@ -126,6 +128,7 @@ const InventoryManagement = () => {
             brand_id: item.brand_id,
             brand: brandName,
             price: parseFloat(item.price),
+            supplierId: supplierId,
             // Add default values for missing fields
             sku: String(item.product_id),
             description: item.description || '',
@@ -149,7 +152,7 @@ const InventoryManagement = () => {
       setMockProducts(mapped);
     };
     if (rawProducts.length > 0) mapProducts();
-  }, [rawProducts, categories, brands]);
+  }, [rawProducts, categories, brands, productSupplierMap]);
 
   // Suppliers state
   const [mockSuppliers, setMockSuppliers] = useState([]);
