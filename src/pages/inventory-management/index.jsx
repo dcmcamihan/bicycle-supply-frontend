@@ -600,9 +600,10 @@ const InventoryManagement = () => {
         brand_id: productData.brand ? parseInt(productData.brand) : null,
         price: normalizedPrice,
         reorder_level: productData.reorderLevel ? parseInt(productData.reorderLevel) : 3,
+        supplier_id: productData.supplier ? parseInt(productData.supplier) : null,
         // Support multiple image URLs (frontend feature). For backward compatibility send image_url as the first image.
         image_url: (Array.isArray(productData.image_urls) && productData.image_urls.length > 0) ? productData.image_urls[0] : (productData.image_url || null),
-        image_urls: Array.isArray(productData.image_urls) ? productData.image_urls : (productData.image_url ? [productData.image_url] : undefined)
+        image_urls: Array.isArray(productData.image_urls) ? productData.image_urls.filter(u => !!u) : (productData.image_url ? [productData.image_url] : [])
       };
 
       const isEdit = Boolean(productId);
@@ -616,6 +617,7 @@ const InventoryManagement = () => {
       });
       if (!res.ok) {
         const errText = await res.text();
+        console.error('Backend error response:', errText);
         throw new Error(errText || (isEdit ? 'Failed to update product' : 'Failed to create product'));
       }
       // Parse created/updated product to get product_id
@@ -623,52 +625,59 @@ const InventoryManagement = () => {
       try { savedProduct = await res.json(); } catch {}
       const newProductId = isEdit ? productId : (savedProduct?.product_id || savedProduct?.id);
 
-      // Sync product images via product-images endpoints if provided
-      try {
-        const urls = Array.isArray(productData.image_urls)
-          ? productData.image_urls.filter(u => !!u)
-          : (productData.image_url ? [productData.image_url] : []);
+      // Sync product images via product-images endpoints if provided (non-blocking)
+      if (true) {
+        // Use a separate try-catch so image errors don't fail the save
+        try {
+          const urls = Array.isArray(productData.image_urls)
+            ? productData.image_urls.filter(u => !!u)
+            : (productData.image_url ? [productData.image_url] : []);
 
-        if (newProductId && Array.isArray(urls)) {
-          // Fetch existing images for this product
-          try {
-            const existingRes = await fetch(API_ENDPOINTS.PRODUCT_IMAGES_BY_PRODUCT(newProductId));
-            const existing = existingRes.ok ? await existingRes.json() : [];
+          if (newProductId && Array.isArray(urls) && urls.length > 0) {
+            // Fetch existing images for this product
+            try {
+              const existingRes = await fetch(API_ENDPOINTS.PRODUCT_IMAGES_BY_PRODUCT(newProductId));
+              const existing = existingRes.ok ? await existingRes.json() : [];
 
-            const existingByUrl = (existing || []).reduce((acc, img) => {
-              if (img && img.image_url) acc[img.image_url] = img;
-              return acc;
-            }, {});
+              const existingByUrl = (existing || []).reduce((acc, img) => {
+                if (img && img.image_url) acc[img.image_url] = img;
+                return acc;
+              }, {});
 
-            // Create any new images not present
-            for (const url of urls) {
-              if (!existingByUrl[url]) {
-                try {
-                  await fetch(API_ENDPOINTS.PRODUCT_IMAGES, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ product_id: newProductId, image_url: url })
-                  });
-                } catch (e) { /* non-blocking */ }
-              }
-            }
-
-            // Delete images that exist but are not in the provided urls (only when editing)
-            if (isEdit) {
-              for (const img of existing || []) {
-                if (!urls.includes(img.image_url)) {
+              // Create any new images not present
+              for (const url of urls) {
+                if (url && !existingByUrl[url]) {
                   try {
-                    await fetch(API_ENDPOINTS.PRODUCT_IMAGE(img.product_image_id), { method: 'DELETE' });
-                  } catch (e) { /* non-blocking */ }
+                    await fetch(API_ENDPOINTS.PRODUCT_IMAGES, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ product_id: newProductId, image_url: url })
+                    });
+                  } catch (e) {
+                    console.warn('Failed to create image entry for URL:', url, e);
+                  }
                 }
               }
+
+              // Delete images that exist but are not in the provided urls (only when editing)
+              if (isEdit) {
+                for (const img of existing || []) {
+                  if (img.image_url && !urls.includes(img.image_url)) {
+                    try {
+                      await fetch(API_ENDPOINTS.PRODUCT_IMAGE(img.product_image_id), { method: 'DELETE' });
+                    } catch (e) {
+                      console.warn('Failed to delete image entry:', img.image_url, e);
+                    }
+                  }
+                }
+              }
+            } catch (e) {
+              console.warn('Failed to fetch existing images for product', newProductId, e);
             }
-          } catch (e) {
-            // ignore image sync failures
           }
+        } catch (e) {
+          console.warn('Image sync error (non-blocking):', e);
         }
-      } catch (e) {
-        // ignore
       }
       // When creating a new product: if initial stock provided and supplier selected,
       // create a supply and a supply_detail so QOH and supplier mapping update correctly
