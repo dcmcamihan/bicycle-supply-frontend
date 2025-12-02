@@ -57,6 +57,9 @@ const ProductGrid = ({ products, onAddToCart, loading }) => {
                     <h4 className="font-body font-medium text-xs text-foreground line-clamp-2" style={{ minHeight: '2.5em', maxHeight: '2.5em', overflow: 'hidden' }}>
                       {product?.name}
                     </h4>
+                    <p className="font-caption text-xs text-muted-foreground truncate">
+                      {product?.brand}
+                    </p>
                     <div className="flex items-center justify-between gap-1">
                       <span className="font-heading font-bold text-[14px] text-primary pr-1">
                         {formatPrice(product?.price)}
