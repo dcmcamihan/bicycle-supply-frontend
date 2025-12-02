@@ -142,6 +142,22 @@ const PointOfSale = () => {
   const response = await fetch(API_ENDPOINTS.PRODUCTS);
         if (!response.ok) throw new Error('Failed to fetch products');
         const data = await response.json();
+        
+        // Fetch brands for mapping
+        let brandsMap = {};
+        try {
+          const brandsRes = await fetch(API_ENDPOINTS.BRANDS || 'http://localhost:3000/api/brands');
+          if (brandsRes.ok) {
+            const brandsData = await brandsRes.json();
+            brandsMap = brandsData.reduce((acc, brand) => {
+              acc[String(brand.brand_id)] = brand.brand_name;
+              return acc;
+            }, {});
+          }
+        } catch (err) {
+          // continue without brand mapping
+        }
+        
         // Map API data to expected format for POS
         const mappedProducts = await Promise.all(
           data.map(async item => {
@@ -162,6 +178,7 @@ const PointOfSale = () => {
               price: parseFloat(item.price),
               category: item.category_code,
               brand_id: item.brand_id,
+              brand: brandsMap[String(item.brand_id)] || item.brand_id,
               image_url: item.image_url || '',
               stock
             };
