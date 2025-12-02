@@ -471,25 +471,25 @@ const PointOfSale = () => {
         />
         
         <main className={`pt-15 transition-smooth ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'}`}>
-          <div className="p-6">
+          <div className="p-4 sm:p-6 lg:p-8">
             <Breadcrumb />
             
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
               <div>
-                <h1 className="font-heading font-bold text-3xl text-foreground">Point of Sale</h1>
-                <p className="font-body text-muted-foreground mt-1">
+                <h1 className="font-heading font-bold text-2xl sm:text-3xl text-foreground">Point of Sale</h1>
+                <p className="font-body text-xs sm:text-sm text-muted-foreground mt-1">
                   Process customer transactions and manage sales
                 </p>
               </div>
               
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center gap-3">
                 <div className="text-right">
                   <p className="font-caption text-xs text-muted-foreground">Today's Date</p>
-                  <p className="font-data text-sm text-foreground">
+                  <p className="font-data text-xs sm:text-sm text-foreground">
                     {new Date()?.toLocaleDateString('en-US', { 
-                      weekday: 'long', 
+                      weekday: 'short', 
                       year: 'numeric', 
-                      month: 'long', 
+                      month: 'short', 
                       day: 'numeric' 
                     })}
                   </p>
@@ -591,9 +591,9 @@ const PointOfSale = () => {
               </div>)
             ) : (
               // Main POS Interface
-              (<div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
+              (<div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-6 lg:gap-6">
                 {/* Left Panel - Products (60% width on desktop) */}
-                <div className="xl:col-span-3 space-y-6">
+                <div className="lg:col-span-3 space-y-4 sm:space-y-6">
                   <ProductSearch 
                     searchTerm={searchTerm}
                     onSearch={handleSearch}
@@ -612,10 +612,10 @@ const PointOfSale = () => {
                   />
                 </div>
                 {/* Right Panel - Cart & Checkout (40% width on desktop) */}
-                <div className="xl:col-span-2 space-y-6">
+                <div className="lg:col-span-2 space-y-4 sm:space-y-6">
 
                   {/* Customer Name (optional) and Cashier selection */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <Input
                       label="Customer Name (optional)"
                       type="text"
@@ -633,7 +633,7 @@ const PointOfSale = () => {
                     />
                   </div>
 
-                  <div className="h-[32rem]">
+                  <div className="h-64 sm:h-80 lg:h-[32rem]">
                     <ShoppingCart
                       cartItems={cartItems}
                       onUpdateQuantity={handleUpdateQuantity}

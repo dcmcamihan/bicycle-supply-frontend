@@ -56,37 +56,39 @@ const ManagementDashboard = () => {
       />
       
       <main className={`pt-16 transition-smooth ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'}`}>
-        <div className="p-6">
-          <div className="max-w-7xl mx-auto">
+        <div className="p-4 sm:p-6 lg:p-8">
+          <div className="max-w-7xl">
             {/* Page Header */}
             <div className="mb-8">
               <Breadcrumb />
-              <h1 className="text-2xl font-bold text-foreground mb-2">Management Dashboard</h1>
-              <p className="text-muted-foreground">
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">Management Dashboard</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground">
                 Manage your store's categories, brands, suppliers, employees, and attendance
               </p>
             </div>
 
             {/* Management Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
               {managementLinks.map((link) => (
                 <Link
                   key={link.path}
                   to={link.path}
-                  className="block p-6 rounded-lg border border-border bg-card hover:border-primary transition-colors"
+                  className="block p-4 sm:p-6 rounded-lg border border-border bg-card hover:border-primary transition-colors"
                 >
-                  <div className="flex items-center mb-4">
-                    <span className="text-2xl text-primary mr-3">{/* Icon component */}</span>
-                    <h2 className="text-xl font-semibold text-foreground">{link.title}</h2>
+                  <div className="flex items-center mb-4 gap-2 sm:gap-3">
+                    <span className="text-xl sm:text-2xl text-primary">{/* Icon component */}</span>
+                    <h2 className="text-lg sm:text-xl font-semibold text-foreground">{link.title}</h2>
                   </div>
-                  <p className="text-muted-foreground">{link.description}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground mb-4">{link.description}</p>
                   <Button
                     variant="ghost"
-                    className="mt-4"
+                    size="sm"
+                    className="mt-2"
                     iconName="ChevronRight"
                     iconPosition="right"
                   >
-                    Manage {link.title}
+                    <span className="hidden sm:inline">Manage {link.title}</span>
+                    <span className="sm:hidden">Manage</span>
                   </Button>
                 </Link>
               ))}

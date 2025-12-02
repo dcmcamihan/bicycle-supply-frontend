@@ -24,53 +24,53 @@ const ProductGrid = ({ products, onAddToCart, loading }) => {
 
   // Always render from current products prop
   return (
-    <div className="bg-card border border-border rounded-lg p-4 shadow-subtle">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-heading font-semibold text-lg text-foreground">Products</h3>
-        <span className="font-body text-sm text-muted-foreground">
+    <div className="bg-card border border-border rounded-lg p-3 sm:p-4 shadow-subtle w-full overflow-hidden">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-2">
+        <h3 className="font-heading font-semibold text-base sm:text-lg text-foreground">Products</h3>
+        <span className="font-body text-xs sm:text-sm text-muted-foreground">
           {products?.length} items found
         </span>
       </div>
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <Icon name="Loader" size={32} className="animate-spin text-primary mr-2" />
-          <span className="font-body text-muted-foreground">Loading products...</span>
+          <span className="font-body text-xs sm:text-sm text-muted-foreground">Loading products...</span>
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-[50rem] min-h-[24rem] overflow-y-auto">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 lg:gap-4 max-h-[50rem] min-h-[24rem] overflow-y-auto">
             {Array.isArray(products) && products.map((product) => {
               const stockStatus = getStockStatus(product?.stock);
               return (
                 <div
                   key={product?.id}
-                  className="bg-muted border border-border rounded-lg p-3 hover:shadow-raised transition-smooth flex flex-col h-full"
+                  className="bg-muted border border-border rounded-lg p-2 sm:p-3 hover:shadow-raised transition-smooth flex flex-col h-full"
                 >
-                  <div className="aspect-square mb-3 overflow-hidden rounded-md bg-background">
+                  <div className="aspect-square mb-2 sm:mb-3 overflow-hidden rounded-md bg-background">
                     <Image
                       src={product?.image_url}
                       alt={product?.name}
                       className="w-full h-full object-cover"
                     />
                   </div>
-                  <div className="space-y-2 flex flex-col flex-1">
-                    <h4 className="font-body font-medium text-xs text-foreground line-clamp-2" style={{ minHeight: '2.5em', maxHeight: '2.5em', overflow: 'hidden' }}>
+                  <div className="space-y-1 sm:space-y-2 flex flex-col flex-1">
+                    <h4 className="font-body font-medium text-xs sm:text-sm text-foreground line-clamp-2" style={{ minHeight: '2.5em', maxHeight: '2.5em', overflow: 'hidden' }}>
                       {product?.name}
                     </h4>
                     <p className="font-caption text-xs text-muted-foreground truncate">
                       {product?.brand}
                     </p>
                     <div className="flex items-center justify-between gap-1">
-                      <span className="font-heading font-bold text-[14px] text-primary pr-1">
+                      <span className="font-heading font-bold text-xs sm:text-sm text-primary pr-1">
                         {formatPrice(product?.price)}
                       </span>
-                      <span className={`font-caption text-[7px] ${stockStatus?.color} pl-1`}>
+                      <span className={`font-caption text-[7px] sm:text-[8px] ${stockStatus?.color} pl-1`}>
                         {stockStatus?.text}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>SKU: {product?.id}</span>
-                      <span>Stock: {product?.stock}</span>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground gap-1">
+                      <span className="truncate">SKU: {product?.id}</span>
+                      <span className="flex-shrink-0">Stock: {product?.stock}</span>
                     </div>
                     <div className="flex-1" />
                     <Button

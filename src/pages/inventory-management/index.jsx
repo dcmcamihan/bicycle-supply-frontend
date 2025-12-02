@@ -898,36 +898,38 @@ const InventoryManagement = () => {
       <main className={`pt-15 transition-smooth ${
         sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'
       }`}>
-        <div className="p-6">
-          <div className="max-w-full mx-auto">
+        <div className="p-4 sm:p-6 lg:p-8">
+          <div className="max-w-full">
             {/* Page Header */}
             <div className="mb-6">
               <Breadcrumb />
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                 <div>
-                  <h1 className="font-heading font-bold text-2xl text-foreground">
+                  <h1 className="font-heading font-bold text-2xl sm:text-3xl text-foreground">
                     Inventory Management
                   </h1>
-                  <p className="font-body text-muted-foreground mt-1">
+                  <p className="font-body text-xs sm:text-sm text-muted-foreground mt-1">
                     Manage your product catalog and monitor stock levels
                   </p>
                 </div>
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center gap-2">
                   <Button
                     onClick={handleAddProduct}
                     iconName="Plus"
                     iconPosition="left"
                     iconSize={18}
+                    size="sm"
                   >
-                    Add Product
+                    <span className="hidden sm:inline">Add Product</span>
+                    <span className="sm:hidden">Add</span>
                   </Button>
                 </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
               {/* Main Content */}
-              <div className="xl:col-span-3 space-y-6">
+              <div className="lg:col-span-3 space-y-4 sm:space-y-6">
                 {/* Filters */}
                 <InventoryFilters
                   filters={filters}
@@ -990,7 +992,7 @@ const InventoryManagement = () => {
               </div>
 
               {/* Sidebar */}
-              <div className="xl:col-span-1">
+              <div className="lg:col-span-1">
                 <InventorySidebar
                   summaryData={summaryData}
                   lowStockItems={lowStockItems}

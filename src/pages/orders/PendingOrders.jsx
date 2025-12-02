@@ -129,49 +129,57 @@ const PendingOrders = () => {
       <Header onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
       <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
       <main className={`pt-15 transition-smooth ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'}`}>
-        <div className="p-6 max-w-6xl mx-auto">
+        <div className="p-4 sm:p-6 max-w-6xl mx-auto">
           <Breadcrumb />
-          <h1 className="font-heading font-bold text-2xl mb-2">Pending Orders</h1>
-          <p className="font-body text-muted-foreground mb-6">Review and complete pending sales orders.</p>
+          <h1 className="font-heading font-bold text-2xl sm:text-3xl mb-2">Pending Orders</h1>
+          <p className="font-body text-xs sm:text-sm text-muted-foreground mb-6">Review and complete pending sales orders.</p>
 
-          <div className="bg-card border border-border rounded-lg p-4 mb-4 flex items-end gap-4">
-            <Input label="Search by ID or Date" value={query} onChange={e=>setQuery(e.target.value)} />
-            <Button variant="outline" onClick={()=>setRefreshKey(k=>k+1)} iconName="RefreshCw" iconPosition="left">Refresh</Button>
+          <div className="bg-card border border-border rounded-lg p-3 sm:p-4 mb-4 flex flex-col sm:flex-row items-start sm:items-end gap-3">
+            <div className="w-full sm:flex-1">
+              <Input label="Search by ID or Date" value={query} onChange={e=>setQuery(e.target.value)} />
+            </div>
+            <Button variant="outline" onClick={()=>setRefreshKey(k=>k+1)} iconName="RefreshCw" iconPosition="left" size="sm">
+              <span className="hidden sm:inline">Refresh</span>
+              <span className="sm:hidden">Refresh</span>
+            </Button>
           </div>
 
-          {error && <div className="text-sm text-destructive mb-3">{error}</div>}
+          {error && <div className="text-xs sm:text-sm text-destructive mb-3">{error}</div>}
           {loading ? (
-            <div className="text-sm text-muted-foreground">Loading…</div>
+            <div className="text-xs sm:text-sm text-muted-foreground">Loading…</div>
           ) : (
             <div className="overflow-x-auto bg-card border border-border rounded-lg">
-              <table className="min-w-full text-sm">
+              <table className="min-w-full text-xs sm:text-sm">
                 <thead>
-                  <tr className="text-left text-muted-foreground">
-                    <th className="py-2 px-3">Sale ID</th>
-                    <th className="py-2 px-3">Date</th>
-                    <th className="py-2 px-3">Cashier</th>
-                    <th className="py-2 px-3">Manager</th>
-                    <th className="py-2 px-3 text-right">Action</th>
+                  <tr className="text-left text-muted-foreground border-b border-border">
+                    <th className="py-2 sm:py-3 px-2 sm:px-4 font-semibold">Sale ID</th>
+                    <th className="py-2 sm:py-3 px-2 sm:px-4 font-semibold hidden sm:table-cell">Date</th>
+                    <th className="py-2 sm:py-3 px-2 sm:px-4 font-semibold">Cashier</th>
+                    <th className="py-2 sm:py-3 px-2 sm:px-4 font-semibold hidden md:table-cell">Manager</th>
+                    <th className="py-2 sm:py-3 px-2 sm:px-4 text-right font-semibold">Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(filtered || []).length === 0 ? (
-                    <tr><td className="py-4 px-3 text-muted-foreground" colSpan={5}>No pending orders found.</td></tr>
+                    <tr><td className="py-4 px-2 sm:px-4 text-muted-foreground" colSpan={5}>No pending orders found.</td></tr>
                   ) : (
                     filtered.map((o) => (
                       <tr key={o.sale_id} className="border-t border-border hover:bg-muted/50 transition-colors">
-                        <td className="py-2 px-3 font-medium">#{o.sale_id}</td>
-                        <td className="py-2 px-3">{o.sale_date ? new Date(o.sale_date).toLocaleString() : '-'}</td>
-                        <td className="py-2 px-3">
-                          <div className="font-medium">{formatEmployeeLabel(employeesById[String(o.cashier)], o.cashier)}</div>
-                          <div className="text-xs text-muted-foreground mt-0.5">{o.cashier ? `ID: ${o.cashier}` : ''}</div>
+                        <td className="py-2 sm:py-3 px-2 sm:px-4 font-medium text-xs sm:text-sm">#{o.sale_id}</td>
+                        <td className="py-2 sm:py-3 px-2 sm:px-4 text-xs sm:text-sm hidden sm:table-cell">{o.sale_date ? new Date(o.sale_date).toLocaleString() : '-'}</td>
+                        <td className="py-2 sm:py-3 px-2 sm:px-4">
+                          <div className="font-medium text-xs sm:text-sm">{formatEmployeeLabel(employeesById[String(o.cashier)], o.cashier)}</div>
+                          <div className="text-xs text-muted-foreground mt-0.5 hidden sm:block">{o.cashier ? `ID: ${o.cashier}` : ''}</div>
                         </td>
-                        <td className="py-2 px-3">
-                          <div className="font-medium">{formatEmployeeLabel(employeesById[String(o.manager)], o.manager)}</div>
+                        <td className="py-2 sm:py-3 px-2 sm:px-4 hidden md:table-cell">
+                          <div className="font-medium text-xs sm:text-sm">{formatEmployeeLabel(employeesById[String(o.manager)], o.manager)}</div>
                           <div className="text-xs text-muted-foreground mt-0.5">{o.manager ? `ID: ${o.manager}` : ''}</div>
                         </td>
-                        <td className="py-2 px-3 text-right">
-                          <Button size="sm" variant="success" onClick={()=>complete(o.sale_id)} iconName="Check" iconPosition="left">Complete</Button>
+                        <td className="py-2 sm:py-3 px-2 sm:px-4 text-right">
+                          <Button size="xs" variant="success" onClick={()=>complete(o.sale_id)} iconName="Check" iconPosition="left">
+                            <span className="hidden sm:inline">Complete</span>
+                            <span className="sm:hidden">Done</span>
+                          </Button>
                         </td>
                       </tr>
                     ))
