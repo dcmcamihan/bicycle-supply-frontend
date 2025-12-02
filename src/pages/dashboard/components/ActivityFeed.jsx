@@ -14,17 +14,27 @@ const ActivityFeed = () => {
     setLoading(true);
     try {
       const currency = new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', minimumFractionDigits: 0 });
-      const productNameCache = new Map();
       const out = [];
 
       // Fetch all data in parallel
-      const [salesRes, suppliesRes, stockoutsRes] = await Promise.all([
+      const [salesRes, suppliesRes, stockoutsRes, productsRes] = await Promise.all([
         fetch(API_ENDPOINTS.SALES),
         fetch(API_ENDPOINTS.SUPPLIES),
-        fetch(API_ENDPOINTS.STOCKOUTS)
+        fetch(API_ENDPOINTS.STOCKOUTS),
+        fetch(API_ENDPOINTS.PRODUCTS)
       ]);
 
-      // Process sales
+      // Build product price map
+      const priceMap = new Map();
+      if (productsRes.ok) {
+        const products = await productsRes.json();
+        const productArray = Array.isArray(products) ? products : (products?.data || []);
+        for (const p of productArray) {
+          priceMap.set(Number(p.product_id || p.id), Number(p.price || p.unit_price || 0));
+        }
+      }
+
+      // Process sales with parallel detail fetching
       if (salesRes.ok) {
         const sales = await salesRes.json();
         const saleDetailsPromises = sales.slice(0, 50).map(sale => ({
@@ -40,33 +50,37 @@ const ActivityFeed = () => {
               let names = [];
               let calculatedTotal = 0;
 
-              // Calculate total from details
+              // Calculate total from details using product price map
               for (const d of details) {
-                const productName = d?.product_name || `#${d?.product_id}`;
+                const productName = d?.product_name || `Product #${d?.product_id}`;
                 names.push(productName);
-                const unit = Number(d?.unit_price ?? 0);
+                
+                const pid = Number(d?.product_id);
+                const price = d?.unit_price !== undefined && d?.unit_price !== null ? Number(d?.unit_price) : (priceMap.get(pid) || 0);
                 const qty = Number(d?.quantity_sold ?? d?.quantity ?? 0);
-                calculatedTotal += unit * qty;
+                calculatedTotal += price * qty;
               }
 
-              // Always use calculated total
-              out.push({
-                id: `sale-${sale?.sale_id || sale?.id}`,
-                type: 'sale',
-                title: 'Sale completed',
-                description: names.slice(0, 3).join(', '),
-                amount: currency.format(calculatedTotal),
-                timestamp: new Date(sale?.sale_date || sale?.date || sale?.created_at),
-                user: sale?.cashier_name || 'POS',
-                icon: 'ShoppingCart',
-                color: 'text-success bg-success/10'
-              });
+              // Only add if there's a valid total
+              if (calculatedTotal > 0 || names.length > 0) {
+                out.push({
+                  id: `sale-${sale?.sale_id || sale?.id}`,
+                  type: 'sale',
+                  title: 'Sale completed',
+                  description: names.slice(0, 3).join(', '),
+                  amount: currency.format(calculatedTotal),
+                  timestamp: new Date(sale?.sale_date || sale?.date || sale?.created_at),
+                  user: sale?.cashier_name || 'POS',
+                  icon: 'ShoppingCart',
+                  color: 'text-success bg-success/10'
+                });
+              }
             }
           } catch {}
         }
       }
 
-      // Process supplies
+      // Process supplies with parallel detail fetching
       if (suppliesRes.ok) {
         const supplies = await suppliesRes.json();
         const supplyDetailsPromises = supplies.slice(0, 30).map(sup => ({
@@ -82,7 +96,7 @@ const ActivityFeed = () => {
               let names = [];
               let qty = 0;
               for (const d of sds) {
-                names.push(d?.product_name || `#${d?.product_id}`);
+                names.push(d?.product_name || `Product #${d?.product_id}`);
                 qty += Number(d?.quantity_supplied ?? d?.quantity ?? 0);
               }
               out.push({
@@ -100,7 +114,7 @@ const ActivityFeed = () => {
         }
       }
 
-      // Process stockouts
+      // Process stockouts with parallel detail fetching
       if (stockoutsRes.ok) {
         const stockouts = await stockoutsRes.json();
         const stockoutDetailsPromises = stockouts.slice(0, 30).map(so => ({
@@ -113,7 +127,7 @@ const ActivityFeed = () => {
         for (const { so, detailsPromise } of stockoutDetailsPromises) {
           const soId = so?.stockout_id || so?.id;
           const ts = so?.stockout_date || so?.date || so?.created_at;
-          const productName = so?.product_name || `#${so?.product_id}`;
+          const productName = so?.product_name || `Product #${so?.product_id}`;
           
           try {
             const detRes = await detailsPromise;
@@ -125,7 +139,7 @@ const ActivityFeed = () => {
                   id: `stockout-${soId}-${d.product_id}`,
                   type: 'inventory',
                   title: 'Inventory adjustment',
-                  description: `${d?.product_name || `#${d?.product_id}`} (-${Math.abs(removed)})`,
+                  description: `${d?.product_name || `Product #${d?.product_id}`} (-${Math.abs(removed)})`,
                   timestamp: new Date(ts),
                   user: so?.manager_name || 'Manager',
                   icon: 'Edit',
