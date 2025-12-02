@@ -5,11 +5,16 @@ import Button from './Button';
 import API_ENDPOINTS from '../../config/api';
 import { useAuth } from '../../contexts/AuthContext';
 
-const Sidebar = ({ isCollapsed = false, onToggle }) => {
-  const [isMobileOpen, setIsMobileOpen] = useState(false);
+const Sidebar = ({ isCollapsed = false, onToggle, mobileOpen = false, onMobileToggle }) => {
+  const [isMobileOpen, setIsMobileOpen] = useState(mobileOpen);
   const location = useLocation();
   const [pendingCount, setPendingCount] = useState(0);
   const { userRole, user } = useAuth();
+
+  // Sync with parent-controlled mobileOpen prop
+  useEffect(() => {
+    setIsMobileOpen(mobileOpen);
+  }, [mobileOpen]);
 
   // Debug logging
   useEffect(() => {
@@ -102,8 +107,9 @@ const Sidebar = ({ isCollapsed = false, onToggle }) => {
   };
 
   const handleMobileToggle = () => {
-    setIsMobileOpen(!isMobileOpen);
-    if (onToggle) onToggle();
+    const newState = !isMobileOpen;
+    setIsMobileOpen(newState);
+    if (onMobileToggle) onMobileToggle(newState);
   };
 
   // Close mobile menu when route changes
@@ -249,36 +255,28 @@ const Sidebar = ({ isCollapsed = false, onToggle }) => {
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className={`hidden lg:flex lg:fixed lg:top-15 lg:bottom-0 lg:left-0 lg:z-900 lg:flex-col bg-card border-r border-border shadow-subtle transition-smooth ${
+      <aside className={`hidden lg:flex lg:fixed lg:top-15 lg:bottom-0 lg:left-0 lg:z-40 lg:flex-col bg-card border-r border-border shadow-subtle transition-all duration-300 ${
         isCollapsed ? 'lg:w-16' : 'lg:w-64'
       }`}>
         <SidebarContent />
       </aside>
 
-      {/* Mobile Sidebar Overlay */}
+      {/* Mobile Sidebar Overlay and Drawer */}
       {isMobileOpen && (
-        <div className="lg:hidden fixed inset-0 z-1100">
+        <div className="lg:hidden fixed inset-0 z-50">
+          {/* Backdrop */}
           <div 
-            className="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300"
             onClick={() => setIsMobileOpen(false)}
+            aria-hidden="true"
           ></div>
-          <aside className="absolute left-0 top-0 bottom-0 w-64 bg-card border-r border-border shadow-raised">
+          
+          {/* Sidebar Drawer */}
+          <aside className="absolute left-0 top-0 bottom-0 w-64 bg-card border-r border-border shadow-lg overflow-y-auto">
             <SidebarContent />
           </aside>
         </div>
       )}
-
-      {/* Mobile Sidebar Toggle Button */}
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={handleMobileToggle}
-        className="lg:hidden fixed bottom-4 right-4 z-1000 bg-primary text-primary-foreground shadow-raised"
-        iconName="Menu"
-        iconSize={20}
-      >
-        <span className="sr-only">Toggle navigation menu</span>
-      </Button>
     </>
   );
 };

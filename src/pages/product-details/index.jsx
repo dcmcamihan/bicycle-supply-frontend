@@ -18,6 +18,7 @@ const ProductDetails = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [showMobileActions, setShowMobileActions] = useState(false);
   const [showAdjust, setShowAdjust] = useState(false);
@@ -414,8 +415,16 @@ const ProductDetails = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header onSidebarToggle={handleSidebarToggle} />
-      <Sidebar isCollapsed={isSidebarCollapsed} onToggle={handleSidebarToggle} />
+      <Header 
+        onSidebarToggle={handleSidebarToggle}
+        onMobileSidebarToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+      />
+      <Sidebar 
+        isCollapsed={isSidebarCollapsed} 
+        onToggle={handleSidebarToggle}
+        mobileOpen={isMobileMenuOpen}
+        onMobileToggle={(isOpen) => setIsMobileMenuOpen(isOpen)}
+      />
       
       <main className={`pt-15 transition-smooth ${
         isSidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'

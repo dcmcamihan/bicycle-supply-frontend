@@ -6,7 +6,7 @@ import { getCartTotalCount } from '../../utils/posCart';
 import { useAuth } from '../../contexts/AuthContext';
 import API_ENDPOINTS from '../../config/api';
 
-const Header = ({ onSidebarToggle, user = null }) => {
+const Header = ({ onSidebarToggle, onMobileSidebarToggle, user = null }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -185,7 +185,7 @@ const Header = ({ onSidebarToggle, user = null }) => {
           <Button
             variant="ghost"
             size="icon"
-            onClick={onSidebarToggle}
+            onClick={onMobileSidebarToggle}
             className="lg:hidden"
             iconName="Menu"
             iconSize={20}

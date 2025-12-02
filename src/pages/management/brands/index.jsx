@@ -11,6 +11,7 @@ const BrandManagement = () => {
   const [editingBrand, setEditingBrand] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const toast = useToast();
 
   // New brand form state
@@ -136,8 +137,8 @@ const BrandManagement = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
-      <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
+      <Header onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)} onMobileSidebarToggle={() => setMobileMenuOpen(!mobileMenuOpen)} />
+      <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} mobileOpen={mobileMenuOpen} onMobileToggle={(isOpen) => setMobileMenuOpen(isOpen)} />
 
       <main className={`pt-16 transition-smooth ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'}`}>
         <div className="p-6">

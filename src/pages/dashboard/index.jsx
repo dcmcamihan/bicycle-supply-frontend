@@ -15,6 +15,7 @@ import { useAuth } from '../../contexts/AuthContext';
 
 const Dashboard = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [todaySales, setTodaySales] = useState(0);
   const [totalInventory, setTotalInventory] = useState(0);
@@ -144,8 +145,17 @@ const Dashboard = () => {
         <meta name="description" content="Jolen's Bicycle Supply dashboard with real-time business insights, sales metrics, and inventory management tools for bicycle shop operations." />
       </Helmet>
       <div className="min-h-screen bg-background">
-        <Header onSidebarToggle={handleSidebarToggle} user={user} />
-        <Sidebar isCollapsed={sidebarCollapsed} onToggle={handleSidebarToggle} />
+        <Header 
+          onSidebarToggle={handleSidebarToggle} 
+          onMobileSidebarToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
+          user={user} 
+        />
+        <Sidebar 
+          isCollapsed={sidebarCollapsed} 
+          onToggle={handleSidebarToggle}
+          mobileOpen={mobileMenuOpen}
+          onMobileToggle={(isOpen) => setMobileMenuOpen(isOpen)}
+        />
         
         <main className={`pt-15 transition-smooth ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'}`}>
           <div className="p-6">

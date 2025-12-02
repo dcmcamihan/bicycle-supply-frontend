@@ -13,6 +13,7 @@ const AttendanceManagement = () => {
   const [attendanceStatuses, setAttendanceStatuses] = useState([]); // ATTNSTAT
   const [emplStatuses, setEmplStatuses] = useState([]); // EMPLSTAT
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const toast = useToast();
   
@@ -262,8 +263,8 @@ const AttendanceManagement = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
-      <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
+      <Header onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)} onMobileSidebarToggle={() => setMobileMenuOpen(!mobileMenuOpen)} />
+      <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} mobileOpen={mobileMenuOpen} onMobileToggle={(isOpen) => setMobileMenuOpen(isOpen)} />
 
       <main className={`pt-16 transition-smooth ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'}`}>
         <div className="p-6">

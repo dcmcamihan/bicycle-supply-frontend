@@ -49,6 +49,7 @@ const InventoryManagement = () => {
     fetchCategories();
   }, []);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [selectedItems, setSelectedItems] = useState([]);
   const [filters, setFilters] = useState({
     search: '',
@@ -884,8 +885,16 @@ const InventoryManagement = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header onSidebarToggle={handleSidebarToggle} />
-      <Sidebar isCollapsed={sidebarCollapsed} onToggle={handleSidebarToggle} />
+      <Header 
+        onSidebarToggle={handleSidebarToggle}
+        onMobileSidebarToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
+      />
+      <Sidebar 
+        isCollapsed={sidebarCollapsed} 
+        onToggle={handleSidebarToggle}
+        mobileOpen={mobileMenuOpen}
+        onMobileToggle={(isOpen) => setMobileMenuOpen(isOpen)}
+      />
       <main className={`pt-15 transition-smooth ${
         sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'
       }`}>

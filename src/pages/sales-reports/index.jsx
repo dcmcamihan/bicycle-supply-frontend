@@ -117,6 +117,7 @@ const SalesReports = () => {
     }
   };
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   // Default dateRange set to 'last7days' (show last 7 days by default)
   // Persist last selected dateRange in localStorage so returning users keep their preference
   const [dateRange, setDateRange] = useState(() => {
@@ -1114,8 +1115,16 @@ const SalesReports = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header onSidebarToggle={handleSidebarToggle} />
-      <Sidebar isCollapsed={sidebarCollapsed} onToggle={handleSidebarToggle} />
+      <Header 
+        onSidebarToggle={handleSidebarToggle}
+        onMobileSidebarToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
+      />
+      <Sidebar 
+        isCollapsed={sidebarCollapsed} 
+        onToggle={handleSidebarToggle}
+        mobileOpen={mobileMenuOpen}
+        onMobileToggle={(isOpen) => setMobileMenuOpen(isOpen)}
+      />
       
       <main className={`pt-15 transition-smooth ${
         sidebarCollapsed ? 'lg:pl-16' : 'lg:pl-64'
