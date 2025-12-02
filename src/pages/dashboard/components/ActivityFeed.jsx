@@ -7,163 +7,165 @@ import API_ENDPOINTS from '../../../config/api';
 const ActivityFeed = () => {
   const [filter, setFilter] = useState('all');
   const [activities, setActivities] = useState([]);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const load = async () => {
+  const loadActivities = async () => {
+    setLoading(true);
+    try {
+      const currency = new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', minimumFractionDigits: 0 });
+      const productNameCache = new Map();
+      const getProductName = async (pid) => {
+        const k = Number(pid);
+        if (productNameCache.has(k)) return productNameCache.get(k);
+        try {
+          const r = await fetch(API_ENDPOINTS.PRODUCT(k));
+          if (r.ok) {
+            const p = await r.json();
+            const name = p.product_name || `#${k}`;
+            productNameCache.set(k, name);
+            return name;
+          }
+        } catch {}
+        return `#${k}`;
+      };
+
+      const out = [];
+
       try {
-        const currency = new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', minimumFractionDigits: 0 });
-        const productNameCache = new Map();
-        const getProductName = async (pid) => {
-          const k = Number(pid);
-          if (productNameCache.has(k)) return productNameCache.get(k);
-          try {
-            const r = await fetch(API_ENDPOINTS.PRODUCT(k));
-            if (r.ok) {
-              const p = await r.json();
-              const name = p.product_name || `#${k}`;
-              productNameCache.set(k, name);
-              return name;
-            }
-          } catch {}
-          return `#${k}`;
-        };
-
-        const out = [];
-
-        try {
-          const salesRes = await fetch(API_ENDPOINTS.SALES);
-          if (salesRes.ok) {
-            const sales = await salesRes.json();
-            for (const sale of sales) {
-              const saleId = sale?.sale_id || sale?.id;
-              const ts = sale?.sale_date || sale?.date || sale?.created_at;
-              let total = Number(sale?.total_amount ?? 0);
-              try {
-                const detRes = await fetch(API_ENDPOINTS.SALE_DETAILS(saleId));
-                if (detRes.ok) {
-                  const details = await detRes.json();
-                  let names = [];
-                  if (!total) {
-                    for (const d of details) {
-                      const nm = await getProductName(d.product_id);
-                      names.push(nm);
-                      const unit = Number(d?.unit_price ?? 0);
-                      const qty = Number(d?.quantity_sold ?? d?.quantity ?? 0);
-                      total += unit * qty;
-                    }
-                  } else {
-                    for (const d of details) {
-                      const nm = await getProductName(d.product_id);
-                      names.push(nm);
-                    }
-                  }
-                  out.push({
-                    id: `sale-${saleId}`,
-                    type: 'sale',
-                    title: 'Sale completed',
-                    description: names.slice(0, 3).join(', '),
-                    amount: currency.format(total),
-                    timestamp: new Date(ts),
-                    user: sale?.cashier_name || 'POS',
-                    icon: 'ShoppingCart',
-                    color: 'text-success bg-success/10'
-                  });
+        const salesRes = await fetch(API_ENDPOINTS.SALES);
+        if (salesRes.ok) {
+          const sales = await salesRes.json();
+          for (const sale of sales) {
+            const saleId = sale?.sale_id || sale?.id;
+            const ts = sale?.sale_date || sale?.date || sale?.created_at;
+            let total = Number(sale?.total_amount ?? 0);
+            try {
+              const detRes = await fetch(API_ENDPOINTS.SALE_DETAILS(saleId));
+              if (detRes.ok) {
+                const details = await detRes.json();
+                let names = [];
+                // Always recalculate total from details to ensure accuracy
+                let calculatedTotal = 0;
+                for (const d of details) {
+                  const nm = await getProductName(d.product_id);
+                  names.push(nm);
+                  const unit = Number(d?.unit_price ?? 0);
+                  const qty = Number(d?.quantity_sold ?? d?.quantity ?? 0);
+                  calculatedTotal += unit * qty;
                 }
-              } catch {}
-            }
-          }
-        } catch {}
-
-        try {
-          const sRes = await fetch(API_ENDPOINTS.SUPPLIES);
-          if (sRes.ok) {
-            const supplies = await sRes.json();
-            for (const sup of supplies) {
-              const supId = sup?.supply_id || sup?.id;
-              const ts = sup?.supply_date || sup?.date || sup?.created_at;
-              try {
-                const sdRes = await fetch(API_ENDPOINTS.SUPPLY_DETAILS_BY_SUPPLY(supId));
-                if (sdRes.ok) {
-                  const sds = await sdRes.json();
-                  let names = [];
-                  let qty = 0;
-                  for (const d of sds) {
-                    const nm = await getProductName(d.product_id);
-                    names.push(nm);
-                    qty += Number(d?.quantity_supplied ?? d?.quantity ?? 0);
-                  }
-                  out.push({
-                    id: `supply-${supId}`,
-                    type: 'inventory',
-                    title: 'Stock received',
-                    description: `${names.slice(0, 3).join(', ')} (+${qty})`,
-                    timestamp: new Date(ts),
-                    user: sup?.supplier_name || 'Supplier',
-                    icon: 'Package',
-                    color: 'text-primary bg-primary/10'
-                  });
-                }
-              } catch {}
-            }
-          }
-        } catch {}
-
-        try {
-          const soRes = await fetch(API_ENDPOINTS.STOCKOUTS);
-          if (soRes.ok) {
-            const stockouts = await soRes.json();
-            for (const so of stockouts) {
-              const soId = so?.stockout_id || so?.id;
-              const ts = so?.stockout_date || so?.date || so?.created_at;
-              const pid = Number(so?.product_id);
-              const removed = Number(so?.quantity_removed ?? 0);
-              if (pid && removed) {
-                const nm = await getProductName(pid);
+                // Use calculated total if no total_amount, otherwise use calculated
+                total = calculatedTotal || total;
                 out.push({
-                  id: `stockout-${soId}`,
-                  type: 'inventory',
-                  title: 'Inventory adjustment',
-                  description: `${nm} (-${Math.abs(removed)})`,
+                  id: `sale-${saleId}`,
+                  type: 'sale',
+                  title: 'Sale completed',
+                  description: names.slice(0, 3).join(', '),
+                  amount: currency.format(total),
                   timestamp: new Date(ts),
-                  user: so?.manager_name || 'Manager',
-                  icon: 'Edit',
-                  color: 'text-warning bg-warning/10'
+                  user: sale?.cashier_name || 'POS',
+                  icon: 'ShoppingCart',
+                  color: 'text-success bg-success/10'
                 });
-                continue;
               }
-              try {
-                if (API_ENDPOINTS.STOCKOUT_DETAILS_BY_STOCKOUT) {
-                  const detRes = await fetch(API_ENDPOINTS.STOCKOUT_DETAILS_BY_STOCKOUT(soId));
-                  if (detRes.ok) {
-                    const dets = await detRes.json();
-                    for (const d of dets) {
-                      const nm = await getProductName(d.product_id);
-                      out.push({
-                        id: `stockout-${soId}-${d.product_id}`,
-                        type: 'inventory',
-                        title: 'Inventory adjustment',
-                        description: `${nm} (-${Math.abs(Number(d?.quantity_removed ?? d?.quantity ?? 0))})`,
-                        timestamp: new Date(ts),
-                        user: so?.manager_name || 'Manager',
-                        icon: 'Edit',
-                        color: 'text-warning bg-warning/10'
-                      });
-                    }
+            } catch {}
+          }
+        }
+      } catch {}
+
+      try {
+        const sRes = await fetch(API_ENDPOINTS.SUPPLIES);
+        if (sRes.ok) {
+          const supplies = await sRes.json();
+          for (const sup of supplies) {
+            const supId = sup?.supply_id || sup?.id;
+            const ts = sup?.supply_date || sup?.date || sup?.created_at;
+            try {
+              const sdRes = await fetch(API_ENDPOINTS.SUPPLY_DETAILS_BY_SUPPLY(supId));
+              if (sdRes.ok) {
+                const sds = await sdRes.json();
+                let names = [];
+                let qty = 0;
+                for (const d of sds) {
+                  const nm = await getProductName(d.product_id);
+                  names.push(nm);
+                  qty += Number(d?.quantity_supplied ?? d?.quantity ?? 0);
+                }
+                out.push({
+                  id: `supply-${supId}`,
+                  type: 'inventory',
+                  title: 'Stock received',
+                  description: `${names.slice(0, 3).join(', ')} (+${qty})`,
+                  timestamp: new Date(ts),
+                  user: sup?.supplier_name || 'Supplier',
+                  icon: 'Package',
+                  color: 'text-primary bg-primary/10'
+                });
+              }
+            } catch {}
+          }
+        }
+      } catch {}
+
+      try {
+        const soRes = await fetch(API_ENDPOINTS.STOCKOUTS);
+        if (soRes.ok) {
+          const stockouts = await soRes.json();
+          for (const so of stockouts) {
+            const soId = so?.stockout_id || so?.id;
+            const ts = so?.stockout_date || so?.date || so?.created_at;
+            const pid = Number(so?.product_id);
+            const removed = Number(so?.quantity_removed ?? 0);
+            if (pid && removed) {
+              const nm = await getProductName(pid);
+              out.push({
+                id: `stockout-${soId}`,
+                type: 'inventory',
+                title: 'Inventory adjustment',
+                description: `${nm} (-${Math.abs(removed)})`,
+                timestamp: new Date(ts),
+                user: so?.manager_name || 'Manager',
+                icon: 'Edit',
+                color: 'text-warning bg-warning/10'
+              });
+              continue;
+            }
+            try {
+              if (API_ENDPOINTS.STOCKOUT_DETAILS_BY_STOCKOUT) {
+                const detRes = await fetch(API_ENDPOINTS.STOCKOUT_DETAILS_BY_STOCKOUT(soId));
+                if (detRes.ok) {
+                  const dets = await detRes.json();
+                  for (const d of dets) {
+                    const nm = await getProductName(d.product_id);
+                    out.push({
+                      id: `stockout-${soId}-${d.product_id}`,
+                      type: 'inventory',
+                      title: 'Inventory adjustment',
+                      description: `${nm} (-${Math.abs(Number(d?.quantity_removed ?? d?.quantity ?? 0))})`,
+                      timestamp: new Date(ts),
+                      user: so?.manager_name || 'Manager',
+                      icon: 'Edit',
+                      color: 'text-warning bg-warning/10'
+                    });
                   }
                 }
-              } catch {}
-            }
+              }
+            } catch {}
           }
-        } catch {}
+        }
+      } catch {}
 
-        out.sort((a, b) => b.timestamp - a.timestamp);
-        setActivities(out.slice(0, 25));
-      } catch {
-        setActivities([]);
-      }
-    };
-    load();
+      out.sort((a, b) => b.timestamp - a.timestamp);
+      setActivities(out.slice(0, 25));
+    } catch {
+      setActivities([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadActivities();
   }, []);
 
   const filterOptions = [
@@ -202,12 +204,14 @@ const ActivityFeed = () => {
         <Button
           variant="ghost"
           size="sm"
-          iconName="Filter"
+          iconName="RefreshCw"
           iconPosition="left"
-          onClick={() => console.log('Open filter options')}
+          onClick={loadActivities}
+          disabled={loading}
           className="text-xs sm:text-sm whitespace-nowrap"
         >
-          Filter
+          <span className="hidden sm:inline">Refresh</span>
+          <span className="sm:hidden">Refresh</span>
         </Button>
       </div>
       {/* Filter Tabs */}
@@ -229,54 +233,60 @@ const ActivityFeed = () => {
       </div>
       {/* Activity List */}
       <div className="space-y-2 sm:space-y-3 max-h-96 overflow-y-auto">
-        {filteredActivities?.map((activity) => (
-          <div
-            key={activity?.id}
-            className="flex gap-3 p-2 sm:p-3 hover:bg-muted/50 rounded-lg transition-smooth min-w-0"
-          >
-            <div className={`w-8 sm:w-10 h-8 sm:h-10 rounded-full flex items-center justify-center flex-shrink-0 ${activity?.color}`}>
-              <Icon name={activity?.icon} size={14} />
-            </div>
-            
-            <div className="flex-1 min-w-0">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 mb-1">
-                <h4 className="font-body font-medium text-foreground text-sm truncate">
-                  {activity?.title}
-                </h4>
-                {activity?.amount && (
-                  <span className={`font-data text-xs sm:text-sm font-semibold flex-shrink-0 ${
-                    activity?.amount?.startsWith('-') ? 'text-destructive' : 'text-success'
-                  }`}>
-                    {activity?.amount}
-                  </span>
-                )}
-              </div>
-              
-              <p className="font-caption text-xs sm:text-sm text-muted-foreground mb-2 line-clamp-2">
-                {activity?.description}
-              </p>
-              
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-xs">
-                <span className="font-caption text-muted-foreground truncate">
-                  by {activity?.user}
-                </span>
-                <span className="font-caption text-muted-foreground">
-                  {formatTime(activity?.timestamp)}
-                </span>
-              </div>
-            </div>
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-12">
+            <Icon name="Loader" size={32} className="animate-spin text-primary mb-2" />
+            <p className="font-body text-sm text-muted-foreground">Loading activities...</p>
           </div>
-        ))}
+        ) : filteredActivities?.length === 0 ? (
+          <div className="text-center py-6 sm:py-8">
+            <Icon name="Inbox" size={40} className="text-muted-foreground mx-auto mb-3" />
+            <p className="font-body text-muted-foreground mb-2 text-sm">No activities found</p>
+            <p className="font-caption text-xs sm:text-sm text-muted-foreground">
+              Try adjusting your filter settings
+            </p>
+          </div>
+        ) : (
+          filteredActivities?.map((activity) => (
+            <div
+              key={activity?.id}
+              className="flex gap-3 p-2 sm:p-3 hover:bg-muted/50 rounded-lg transition-smooth min-w-0"
+            >
+              <div className={`w-8 sm:w-10 h-8 sm:h-10 rounded-full flex items-center justify-center flex-shrink-0 ${activity?.color}`}>
+                <Icon name={activity?.icon} size={14} />
+              </div>
+              
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 mb-1">
+                  <h4 className="font-body font-medium text-foreground text-sm truncate">
+                    {activity?.title}
+                  </h4>
+                  {activity?.amount && (
+                    <span className={`font-data text-xs sm:text-sm font-semibold flex-shrink-0 ${
+                      activity?.amount?.startsWith('-') ? 'text-destructive' : 'text-success'
+                    }`}>
+                      {activity?.amount}
+                    </span>
+                  )}
+                </div>
+                
+                <p className="font-caption text-xs sm:text-sm text-muted-foreground mb-2 line-clamp-2">
+                  {activity?.description}
+                </p>
+                
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-xs">
+                  <span className="font-caption text-muted-foreground truncate">
+                    by {activity?.user}
+                  </span>
+                  <span className="font-caption text-muted-foreground">
+                    {formatTime(activity?.timestamp)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
       </div>
-      {filteredActivities?.length === 0 && (
-        <div className="text-center py-6 sm:py-8">
-          <Icon name="Inbox" size={40} className="text-muted-foreground mx-auto mb-3" />
-          <p className="font-body text-muted-foreground mb-2 text-sm">No activities found</p>
-          <p className="font-caption text-xs sm:text-sm text-muted-foreground">
-            Try adjusting your filter settings
-          </p>
-        </div>
-      )}
       <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-border">
         <Button
           variant="ghost"
