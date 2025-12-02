@@ -15,146 +15,143 @@ const ActivityFeed = () => {
     try {
       const currency = new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', minimumFractionDigits: 0 });
       const productNameCache = new Map();
-      const getProductName = async (pid) => {
-        const k = Number(pid);
-        if (productNameCache.has(k)) return productNameCache.get(k);
-        try {
-          const r = await fetch(API_ENDPOINTS.PRODUCT(k));
-          if (r.ok) {
-            const p = await r.json();
-            const name = p.product_name || `#${k}`;
-            productNameCache.set(k, name);
-            return name;
-          }
-        } catch {}
-        return `#${k}`;
-      };
-
       const out = [];
 
-      try {
-        const salesRes = await fetch(API_ENDPOINTS.SALES);
-        if (salesRes.ok) {
-          const sales = await salesRes.json();
-          for (const sale of sales) {
-            const saleId = sale?.sale_id || sale?.id;
-            const ts = sale?.sale_date || sale?.date || sale?.created_at;
-            let total = Number(sale?.total_amount ?? 0);
-            try {
-              const detRes = await fetch(API_ENDPOINTS.SALE_DETAILS(saleId));
-              if (detRes.ok) {
-                const details = await detRes.json();
-                let names = [];
-                // Always recalculate total from details to ensure accuracy
-                let calculatedTotal = 0;
-                for (const d of details) {
-                  const nm = await getProductName(d.product_id);
-                  names.push(nm);
-                  const unit = Number(d?.unit_price ?? 0);
-                  const qty = Number(d?.quantity_sold ?? d?.quantity ?? 0);
-                  calculatedTotal += unit * qty;
-                }
-                // Use calculated total if no total_amount, otherwise use calculated
-                total = calculatedTotal || total;
-                out.push({
-                  id: `sale-${saleId}`,
-                  type: 'sale',
-                  title: 'Sale completed',
-                  description: names.slice(0, 3).join(', '),
-                  amount: currency.format(total),
-                  timestamp: new Date(ts),
-                  user: sale?.cashier_name || 'POS',
-                  icon: 'ShoppingCart',
-                  color: 'text-success bg-success/10'
-                });
-              }
-            } catch {}
-          }
-        }
-      } catch {}
+      // Fetch all data in parallel
+      const [salesRes, suppliesRes, stockoutsRes] = await Promise.all([
+        fetch(API_ENDPOINTS.SALES),
+        fetch(API_ENDPOINTS.SUPPLIES),
+        fetch(API_ENDPOINTS.STOCKOUTS)
+      ]);
 
-      try {
-        const sRes = await fetch(API_ENDPOINTS.SUPPLIES);
-        if (sRes.ok) {
-          const supplies = await sRes.json();
-          for (const sup of supplies) {
-            const supId = sup?.supply_id || sup?.id;
-            const ts = sup?.supply_date || sup?.date || sup?.created_at;
-            try {
-              const sdRes = await fetch(API_ENDPOINTS.SUPPLY_DETAILS_BY_SUPPLY(supId));
-              if (sdRes.ok) {
-                const sds = await sdRes.json();
-                let names = [];
-                let qty = 0;
-                for (const d of sds) {
-                  const nm = await getProductName(d.product_id);
-                  names.push(nm);
-                  qty += Number(d?.quantity_supplied ?? d?.quantity ?? 0);
-                }
-                out.push({
-                  id: `supply-${supId}`,
-                  type: 'inventory',
-                  title: 'Stock received',
-                  description: `${names.slice(0, 3).join(', ')} (+${qty})`,
-                  timestamp: new Date(ts),
-                  user: sup?.supplier_name || 'Supplier',
-                  icon: 'Package',
-                  color: 'text-primary bg-primary/10'
-                });
-              }
-            } catch {}
-          }
-        }
-      } catch {}
+      // Process sales
+      if (salesRes.ok) {
+        const sales = await salesRes.json();
+        const saleDetailsPromises = sales.slice(0, 50).map(sale => ({
+          sale,
+          detailsPromise: fetch(API_ENDPOINTS.SALE_DETAILS(sale?.sale_id || sale?.id))
+        }));
 
-      try {
-        const soRes = await fetch(API_ENDPOINTS.STOCKOUTS);
-        if (soRes.ok) {
-          const stockouts = await soRes.json();
-          for (const so of stockouts) {
-            const soId = so?.stockout_id || so?.id;
-            const ts = so?.stockout_date || so?.date || so?.created_at;
-            const pid = Number(so?.product_id);
-            const removed = Number(so?.quantity_removed ?? 0);
-            if (pid && removed) {
-              const nm = await getProductName(pid);
+        for (const { sale, detailsPromise } of saleDetailsPromises) {
+          try {
+            const detRes = await detailsPromise;
+            if (detRes.ok) {
+              const details = await detRes.json();
+              let names = [];
+              let calculatedTotal = 0;
+
+              // Calculate total from details
+              for (const d of details) {
+                const productName = d?.product_name || `#${d?.product_id}`;
+                names.push(productName);
+                const unit = Number(d?.unit_price ?? 0);
+                const qty = Number(d?.quantity_sold ?? d?.quantity ?? 0);
+                calculatedTotal += unit * qty;
+              }
+
+              // Always use calculated total
               out.push({
-                id: `stockout-${soId}`,
-                type: 'inventory',
-                title: 'Inventory adjustment',
-                description: `${nm} (-${Math.abs(removed)})`,
-                timestamp: new Date(ts),
-                user: so?.manager_name || 'Manager',
-                icon: 'Edit',
-                color: 'text-warning bg-warning/10'
+                id: `sale-${sale?.sale_id || sale?.id}`,
+                type: 'sale',
+                title: 'Sale completed',
+                description: names.slice(0, 3).join(', '),
+                amount: currency.format(calculatedTotal),
+                timestamp: new Date(sale?.sale_date || sale?.date || sale?.created_at),
+                user: sale?.cashier_name || 'POS',
+                icon: 'ShoppingCart',
+                color: 'text-success bg-success/10'
               });
-              continue;
             }
-            try {
-              if (API_ENDPOINTS.STOCKOUT_DETAILS_BY_STOCKOUT) {
-                const detRes = await fetch(API_ENDPOINTS.STOCKOUT_DETAILS_BY_STOCKOUT(soId));
-                if (detRes.ok) {
-                  const dets = await detRes.json();
-                  for (const d of dets) {
-                    const nm = await getProductName(d.product_id);
-                    out.push({
-                      id: `stockout-${soId}-${d.product_id}`,
-                      type: 'inventory',
-                      title: 'Inventory adjustment',
-                      description: `${nm} (-${Math.abs(Number(d?.quantity_removed ?? d?.quantity ?? 0))})`,
-                      timestamp: new Date(ts),
-                      user: so?.manager_name || 'Manager',
-                      icon: 'Edit',
-                      color: 'text-warning bg-warning/10'
-                    });
-                  }
-                }
-              }
-            } catch {}
-          }
+          } catch {}
         }
-      } catch {}
+      }
 
+      // Process supplies
+      if (suppliesRes.ok) {
+        const supplies = await suppliesRes.json();
+        const supplyDetailsPromises = supplies.slice(0, 30).map(sup => ({
+          sup,
+          detailsPromise: fetch(API_ENDPOINTS.SUPPLY_DETAILS_BY_SUPPLY(sup?.supply_id || sup?.id))
+        }));
+
+        for (const { sup, detailsPromise } of supplyDetailsPromises) {
+          try {
+            const sdRes = await detailsPromise;
+            if (sdRes.ok) {
+              const sds = await sdRes.json();
+              let names = [];
+              let qty = 0;
+              for (const d of sds) {
+                names.push(d?.product_name || `#${d?.product_id}`);
+                qty += Number(d?.quantity_supplied ?? d?.quantity ?? 0);
+              }
+              out.push({
+                id: `supply-${sup?.supply_id || sup?.id}`,
+                type: 'inventory',
+                title: 'Stock received',
+                description: `${names.slice(0, 3).join(', ')} (+${qty})`,
+                timestamp: new Date(sup?.supply_date || sup?.date || sup?.created_at),
+                user: sup?.supplier_name || 'Supplier',
+                icon: 'Package',
+                color: 'text-primary bg-primary/10'
+              });
+            }
+          } catch {}
+        }
+      }
+
+      // Process stockouts
+      if (stockoutsRes.ok) {
+        const stockouts = await stockoutsRes.json();
+        const stockoutDetailsPromises = stockouts.slice(0, 30).map(so => ({
+          so,
+          detailsPromise: API_ENDPOINTS.STOCKOUT_DETAILS_BY_STOCKOUT ? 
+            fetch(API_ENDPOINTS.STOCKOUT_DETAILS_BY_STOCKOUT(so?.stockout_id || so?.id)) : 
+            Promise.resolve(null)
+        }));
+
+        for (const { so, detailsPromise } of stockoutDetailsPromises) {
+          const soId = so?.stockout_id || so?.id;
+          const ts = so?.stockout_date || so?.date || so?.created_at;
+          const productName = so?.product_name || `#${so?.product_id}`;
+          
+          try {
+            const detRes = await detailsPromise;
+            if (detRes && detRes.ok) {
+              const dets = await detRes.json();
+              for (const d of dets) {
+                const removed = Number(d?.quantity_removed ?? d?.quantity ?? 0);
+                out.push({
+                  id: `stockout-${soId}-${d.product_id}`,
+                  type: 'inventory',
+                  title: 'Inventory adjustment',
+                  description: `${d?.product_name || `#${d?.product_id}`} (-${Math.abs(removed)})`,
+                  timestamp: new Date(ts),
+                  user: so?.manager_name || 'Manager',
+                  icon: 'Edit',
+                  color: 'text-warning bg-warning/10'
+                });
+              }
+            } else {
+              const removed = Number(so?.quantity_removed ?? 0);
+              if (removed) {
+                out.push({
+                  id: `stockout-${soId}`,
+                  type: 'inventory',
+                  title: 'Inventory adjustment',
+                  description: `${productName} (-${Math.abs(removed)})`,
+                  timestamp: new Date(ts),
+                  user: so?.manager_name || 'Manager',
+                  icon: 'Edit',
+                  color: 'text-warning bg-warning/10'
+                });
+              }
+            }
+          } catch {}
+        }
+      }
+
+      // Sort and limit to 25 most recent
       out.sort((a, b) => b.timestamp - a.timestamp);
       setActivities(out.slice(0, 25));
     } catch {
