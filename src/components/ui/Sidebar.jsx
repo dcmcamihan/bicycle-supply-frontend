@@ -7,6 +7,7 @@ import { useAuth } from '../../contexts/AuthContext';
 
 const Sidebar = ({ isCollapsed = false, onToggle, mobileOpen = false, onMobileToggle }) => {
   const [isMobileOpen, setIsMobileOpen] = useState(mobileOpen);
+  const [expandedItems, setExpandedItems] = useState({});
   const location = useLocation();
   const [pendingCount, setPendingCount] = useState(0);
   const { userRole, user } = useAuth();
@@ -21,6 +22,18 @@ const Sidebar = ({ isCollapsed = false, onToggle, mobileOpen = false, onMobileTo
     console.log('Current user:', user);
     console.log('User role:', userRole);
   }, [user, userRole]);
+
+  // Auto-expand parent when on a subpage
+  useEffect(() => {
+    navigationItems.forEach((item) => {
+      if (item?.subItems) {
+        const isSubActive = item?.subItems?.some(sub => location?.pathname === sub?.path);
+        if (isSubActive) {
+          setExpandedItems(prev => ({ ...prev, [item?.path]: true }));
+        }
+      }
+    });
+  }, [location?.pathname]);
 
   const navigationItems = [
     {
@@ -150,13 +163,19 @@ const Sidebar = ({ isCollapsed = false, onToggle, mobileOpen = false, onMobileTo
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
       {/* Sidebar Header */}
-      <div className="flex items-center justify-between p-4 border-b border-border">
+      <div className="flex items-center justify-between px-2 py-3 border-b border-border">
         {!isCollapsed && (
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <Icon name="Bike" size={20} color="white" />
+          <div className="flex items-center gap-2.5 flex-1 min-w-0">
+            <div className="w-8 h-8 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center flex-shrink-0 shadow-subtle">
+              <Icon name="Bike" size={18} color="white" />
             </div>
-            <h2 className="font-heading font-bold text-lg text-foreground">Jolen's Bicycle Supply</h2>
+            <h2 className="font-heading font-bold text-sm text-foreground truncate">Jolen's Bicycle</h2>
+          </div>
+        )}
+        
+        {isCollapsed && (
+          <div className="w-8 h-8 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center flex-shrink-0 shadow-subtle mx-auto">
+            <Icon name="Bike" size={18} color="white" />
           </div>
         )}
         
@@ -164,89 +183,149 @@ const Sidebar = ({ isCollapsed = false, onToggle, mobileOpen = false, onMobileTo
           variant="ghost"
           size="icon"
           onClick={onToggle}
-          className="hidden lg:flex"
+          className="hidden lg:flex flex-shrink-0"
           iconName={isCollapsed ? "ChevronRight" : "ChevronLeft"}
-          iconSize={20}
+          iconSize={18}
         >
           <span className="sr-only">Toggle sidebar</span>
         </Button>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-2">
-        {navigationItems?.map((item) => (
-          <div key={item?.path}>
-            <Link
-              to={item?.path}
-              className={`flex items-center space-x-3 px-3 py-2 rounded-lg font-body text-sm transition-smooth group ${
-                isActiveRoute(item?.path)
-                  ? 'bg-primary text-primary-foreground shadow-subtle'
-                  : 'text-foreground hover:bg-muted hover:text-foreground'
-              }`}
-              title={isCollapsed ? item?.label : ''}
-            >
-              <Icon 
-                name={item?.icon} 
-                size={20} 
-                className={`flex-shrink-0 ${
-                  isActiveRoute(item?.path) 
-                    ? 'text-primary-foreground' 
-                    : 'text-muted-foreground group-hover:text-foreground'
-                }`}
-              />
-              {!isCollapsed && (
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium">{item?.label}</div>
-                  {item?.description && (
-                    <div className="text-xs opacity-75 truncate">{item?.description}</div>
+      <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
+        {navigationItems?.map((item) => {
+          const isExpanded = expandedItems[item?.path];
+          const isActive = isActiveRoute(item?.path);
+          const hasSubItems = item?.subItems && item?.subItems?.length > 0;
+          
+          return (
+            <div key={item?.path} className="space-y-0">
+              <div className="flex items-center gap-0">
+                <Link
+                  to={item?.path}
+                  className={`flex-1 flex items-center gap-3 px-3 py-2.5 rounded-lg font-body text-sm transition-smooth group relative ${
+                    isActive
+                      ? 'bg-primary text-primary-foreground shadow-subtle'
+                      : 'text-foreground hover:bg-muted hover:text-foreground'
+                  }`}
+                  title={isCollapsed ? item?.label : ''}
+                >
+                  {/* Left accent bar for main page */}
+                  {isActive && (
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary-foreground rounded-r" />
                   )}
-                </div>
-              )}
-              {/* Pending badge for Orders */}
-              {!isCollapsed && item?.path === '/orders/pending' && (
-                <div className="ml-auto">
-                  <span className="inline-flex items-center justify-center min-w-[22px] h-5 px-2 text-xs rounded-full bg-accent text-accent-foreground border border-border">
-                    {pendingCount}
-                  </span>
-                </div>
-              )}
-            </Link>
-
-            {/* Sub-items for Inventory */}
-            {item?.subItems && !isCollapsed && isActiveRoute(item?.path) && (
-              <div className="ml-6 mt-1 space-y-1">
-                {item?.subItems?.map((subItem) => (
-                  <Link
-                    key={subItem?.path}
-                    to={subItem?.path}
-                    className={`flex items-center space-x-3 px-3 py-2 rounded-lg font-body text-sm transition-smooth ${
-                      location?.pathname === subItem?.path
-                        ? 'bg-secondary text-secondary-foreground'
-                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  
+                  <Icon 
+                    name={item?.icon} 
+                    size={20} 
+                    className={`flex-shrink-0 ${
+                      isActive 
+                        ? 'text-primary-foreground' 
+                        : 'text-muted-foreground group-hover:text-foreground'
                     }`}
+                  />
+                  
+                  {!isCollapsed && (
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium">{item?.label}</div>
+                      {item?.description && (
+                        <div className="text-xs opacity-70 truncate">{item?.description}</div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Pending badge for Orders */}
+                  {!isCollapsed && item?.path === '/orders/pending' && (
+                    <div className="ml-auto flex-shrink-0">
+                      <span className="inline-flex items-center justify-center min-w-[22px] h-5 px-2 text-xs rounded-full bg-accent text-accent-foreground border border-border">
+                        {pendingCount}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {/* Expand/Collapse chevron for items with subItems */}
+                  {!isCollapsed && hasSubItems && (
+                    <Icon 
+                      name="ChevronRight" 
+                      size={16}
+                      className={`flex-shrink-0 ml-auto transition-transform duration-200 text-muted-foreground group-hover:text-foreground ${
+                        isExpanded ? 'rotate-90' : ''
+                      }`}
+                    />
+                  )}
+                </Link>
+                
+                {/* Toggle button for collapsed state */}
+                {isCollapsed && hasSubItems && (
+                  <button
+                    onClick={() => setExpandedItems(prev => ({ ...prev, [item?.path]: !isExpanded }))}
+                    className={`p-1 mr-1 rounded transition-smooth ${
+                      isActive ? 'text-primary-foreground hover:bg-primary/80' : 'text-muted-foreground hover:bg-muted'
+                    }`}
+                    title={isExpanded ? 'Collapse' : 'Expand'}
                   >
-                    <Icon name={subItem?.icon} size={16} />
-                    <span>{subItem?.label}</span>
-                  </Link>
-                ))}
+                    <Icon name={isExpanded ? "ChevronDown" : "ChevronRight"} size={14} />
+                  </button>
+                )}
               </div>
-            )}
-          </div>
-        ))}
+
+              {/* Sub-items */}
+              {hasSubItems && isExpanded && !isCollapsed && (
+                <div className="ml-2 mt-1 space-y-0.5 border-l-2 border-muted pl-3">
+                  {item?.subItems?.map((subItem) => {
+                    const isSubActive = location?.pathname === subItem?.path;
+                    return (
+                      <Link
+                        key={subItem?.path}
+                        to={subItem?.path}
+                        className={`flex items-center gap-3 px-3 py-2 rounded-lg font-body text-sm transition-smooth group relative ${
+                          isSubActive
+                            ? 'text-primary font-medium'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                        }`}
+                        title={isCollapsed ? subItem?.label : ''}
+                      >
+                        {/* Left accent indicator for subpage */}
+                        {isSubActive && (
+                          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-primary rounded-r" />
+                        )}
+                        
+                        <Icon 
+                          name={subItem?.icon} 
+                          size={16}
+                          className={isSubActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'}
+                        />
+                        <span>{subItem?.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </nav>
 
       {/* Sidebar Footer */}
-      <div className="p-4 border-t border-border">
+      <div className="px-2 py-3 border-t border-border">
         {!isCollapsed && (
-          <div className="bg-muted rounded-lg p-3">
-            <div className="flex items-center space-x-2 mb-2">
-              <Icon name="Zap" size={16} className="text-accent" />
-              <span className="font-body font-medium text-sm text-foreground">Quick Tip</span>
+          <div className="bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 rounded-lg p-3 hover:from-primary/15 hover:to-primary/10 transition-colors">
+            <div className="flex items-center gap-2 mb-2">
+              <Icon name="Zap" size={16} className="text-primary flex-shrink-0" />
+              <span className="font-body font-semibold text-xs text-primary">Quick Tip</span>
             </div>
-            <p className="font-caption text-xs text-muted-foreground">
+            <p className="font-caption text-xs text-muted-foreground leading-relaxed">
               Use Ctrl+K to quickly search for products and customers.
             </p>
           </div>
+        )}
+        {isCollapsed && (
+          <button
+            title="Quick Tips"
+            className="w-full p-2 rounded-lg hover:bg-muted transition-smooth text-muted-foreground hover:text-foreground"
+          >
+            <Icon name="Zap" size={18} className="mx-auto text-primary" />
+          </button>
         )}
       </div>
     </div>
