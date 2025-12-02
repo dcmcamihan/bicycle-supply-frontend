@@ -2,6 +2,37 @@ import { useEffect, useState, useRef } from 'react';
 import { motion, useMotionValue, useTransform } from 'motion/react';
 import { History, Heart, Zap } from 'lucide-react';
 
+// Hook to calculate responsive carousel width
+function useResponsiveCarouselWidth(baseWidth = 620) {
+  const [width, setWidth] = useState(baseWidth);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const calculateWidth = () => {
+      if (containerRef.current?.parentElement) {
+        const parentWidth = containerRef.current.parentElement.clientWidth;
+        const padding = 32; // px-4 on each side = 32px total
+        const maxWidth = Math.min(parentWidth - padding, baseWidth);
+        setWidth(Math.max(maxWidth, 280)); // Minimum 280px for very small screens
+      }
+    };
+
+    calculateWidth();
+    const resizeObserver = new ResizeObserver(calculateWidth);
+    if (containerRef.current?.parentElement) {
+      resizeObserver.observe(containerRef.current.parentElement);
+    }
+
+    window.addEventListener('resize', calculateWidth);
+    return () => {
+      window.removeEventListener('resize', calculateWidth);
+      resizeObserver.disconnect();
+    };
+  }, [baseWidth]);
+
+  return [width, containerRef];
+}
+
 const DEFAULT_ITEMS = [
   {
     title: 'Text Animations',
@@ -44,8 +75,9 @@ export default function Carousel({
   loop = false,
   round = false
 }) {
+  const [responsiveWidth, containerRef] = useResponsiveCarouselWidth(baseWidth);
   const containerPadding = 16;
-  const itemWidth = baseWidth - containerPadding * 2;
+  const itemWidth = responsiveWidth - containerPadding * 2;
   const trackItemOffset = itemWidth + GAP;
 
   const carouselItems = loop ? [...items, items[0]] : items;
@@ -54,7 +86,6 @@ export default function Carousel({
   const [isHovered, setIsHovered] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
 
-  const containerRef = useRef(null);
   useEffect(() => {
     if (pauseOnHover && containerRef.current) {
       const container = containerRef.current;
@@ -67,7 +98,7 @@ export default function Carousel({
         container.removeEventListener('mouseleave', handleMouseLeave);
       };
     }
-  }, [pauseOnHover]);
+  }, [pauseOnHover, containerRef]);
 
   useEffect(() => {
     if (autoplay && (!pauseOnHover || !isHovered)) {
@@ -131,8 +162,8 @@ export default function Carousel({
         round ? 'rounded-full border border-white' : 'rounded-3xl bg-gradient-to-br from-slate-900/50 to-slate-900/30 backdrop-blur-sm border border-emerald-500/20 shadow-2xl'
       }`}
       style={{
-        width: `${baseWidth}px`,
-        ...(round && { height: `${baseWidth}px` })
+        width: `${responsiveWidth}px`,
+        ...(round && { height: `${responsiveWidth}px` })
       }}
     >
       <motion.div

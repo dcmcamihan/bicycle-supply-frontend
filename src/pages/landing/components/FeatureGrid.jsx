@@ -3,7 +3,7 @@ import MagicBento from '../../../components/shared/MagicBento';
 
 const FeatureGrid = () => {
   return (
-    <div className="mx-auto max-w-7xl px-6 py-20">
+    <div className="mx-auto max-w-7xl px-4 sm:px-6 py-12 sm:py-20">
       <MagicBento 
         textAutoHide={true}
         enableStars={true}
