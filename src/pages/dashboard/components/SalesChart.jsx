@@ -181,36 +181,36 @@ const SalesChart = () => {
   };
 
   return (
-    <div className="bg-card border border-border rounded-lg p-6 shadow-subtle">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h3 className="font-heading text-lg font-semibold text-foreground">Sales Performance</h3>
-          <p className="font-caption text-sm text-muted-foreground">Track your daily and weekly sales trends</p>
+    <div className="bg-card border border-border rounded-lg p-4 sm:p-6 shadow-subtle w-full overflow-hidden">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
+        <div className="min-w-0">
+          <h3 className="font-heading text-base sm:text-lg font-semibold text-foreground truncate">Sales Performance</h3>
+          <p className="font-caption text-xs sm:text-sm text-muted-foreground line-clamp-1">Track your daily and weekly sales trends</p>
         </div>
         
-        <div className="flex items-center space-x-2">
-          <div className="flex bg-muted rounded-lg p-1">
+        <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0">
+          <div className="flex bg-muted rounded-lg p-1 overflow-x-auto">
             <Button
               variant={timeRange === 'day' ? 'default' : 'ghost'}
-              size="sm"
+              size="xs"
               onClick={() => setTimeRange('day')}
-              className="px-3 py-1"
+              className="px-2 sm:px-3 py-1 text-xs whitespace-nowrap"
             >
               Day
             </Button>
             <Button
               variant={timeRange === 'week' ? 'default' : 'ghost'}
-              size="sm"
+              size="xs"
               onClick={() => setTimeRange('week')}
-              className="px-3 py-1"
+              className="px-2 sm:px-3 py-1 text-xs whitespace-nowrap"
             >
               Week
             </Button>
             <Button
               variant={timeRange === 'month' ? 'default' : 'ghost'}
-              size="sm"
+              size="xs"
               onClick={() => setTimeRange('month')}
-              className="px-3 py-1"
+              className="px-2 sm:px-3 py-1 text-xs whitespace-nowrap"
             >
               Month
             </Button>
@@ -230,26 +230,30 @@ const SalesChart = () => {
         </div>
       </div>
 
-      <div className="w-full h-80" aria-label="Sales Performance Chart">
+      <div className="w-full h-64 sm:h-80 overflow-x-auto" aria-label="Sales Performance Chart">
         {(!hasAnyData && !loading) ? (
-          <div className="w-full h-full flex items-center justify-center text-sm text-muted-foreground border border-dashed border-border rounded-md">
+          <div className="w-full h-full flex items-center justify-center text-xs sm:text-sm text-muted-foreground border border-dashed border-border rounded-md p-4">
             No sales data available for the selected range.
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             {chartType === 'bar' ? (
-              <BarChart data={currentData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+              <BarChart data={currentData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                 <XAxis 
                   dataKey="name" 
                   stroke="var(--color-muted-foreground)"
-                  fontSize={12}
+                  fontSize={10}
                   fontFamily="var(--font-caption)"
+                  tick={{ fontSize: 10 }}
+                  interval={window.innerWidth < 640 ? 1 : 0}
                 />
                 <YAxis 
                   stroke="var(--color-muted-foreground)"
-                  fontSize={12}
+                  fontSize={10}
                   fontFamily="var(--font-caption)"
+                  tick={{ fontSize: 10 }}
+                  width={35}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Bar dataKey="sales" radius={[4, 4, 0, 0]}>
@@ -259,27 +263,31 @@ const SalesChart = () => {
                 </Bar>
               </BarChart>
             ) : (
-              <LineChart data={currentData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+              <LineChart data={currentData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                 <XAxis 
                   dataKey="name" 
                   stroke="var(--color-muted-foreground)"
-                  fontSize={12}
+                  fontSize={10}
                   fontFamily="var(--font-caption)"
+                  tick={{ fontSize: 10 }}
+                  interval={window.innerWidth < 640 ? 1 : 0}
                 />
                 <YAxis 
                   stroke="var(--color-muted-foreground)"
-                  fontSize={12}
+                  fontSize={10}
                   fontFamily="var(--font-caption)"
+                  tick={{ fontSize: 10 }}
+                  width={35}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Line 
                   type="monotone" 
                   dataKey="sales" 
                   stroke="var(--color-primary)" 
-                  strokeWidth={3}
-                  dot={{ fill: 'var(--color-primary)', strokeWidth: 2, r: 4 }}
-                  activeDot={{ r: 6, stroke: 'var(--color-primary)', strokeWidth: 2 }}
+                  strokeWidth={2}
+                  dot={{ fill: 'var(--color-primary)', strokeWidth: 2, r: 3 }}
+                  activeDot={{ r: 5, stroke: 'var(--color-primary)', strokeWidth: 2 }}
                 />
               </LineChart>
             )}

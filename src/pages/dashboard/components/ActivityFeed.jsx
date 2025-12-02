@@ -197,7 +197,7 @@ const ActivityFeed = () => {
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-2">
           <Icon name="Activity" size={20} className="text-primary" />
-          <h3 className="font-heading text-lg font-semibold text-foreground">Recent Activity</h3>
+          <h3 className="font-heading text-base sm:text-lg font-semibold text-foreground">Recent Activity</h3>
         </div>
         <Button
           variant="ghost"
@@ -205,45 +205,46 @@ const ActivityFeed = () => {
           iconName="Filter"
           iconPosition="left"
           onClick={() => console.log('Open filter options')}
+          className="text-xs sm:text-sm whitespace-nowrap"
         >
           Filter
         </Button>
       </div>
       {/* Filter Tabs */}
-      <div className="flex space-x-1 mb-6 bg-muted rounded-lg p-1">
+      <div className="flex gap-1 mb-4 sm:mb-6 bg-muted rounded-lg p-1 overflow-x-auto">
         {filterOptions?.map((option) => (
           <button
             key={option?.value}
             onClick={() => setFilter(option?.value)}
-            className={`flex items-center space-x-2 px-3 py-2 rounded-md font-body text-sm transition-smooth ${
+            className={`flex items-center space-x-1 px-2 sm:px-3 py-2 rounded-md font-body text-xs sm:text-sm transition-smooth whitespace-nowrap flex-shrink-0 ${
               filter === option?.value
                 ? 'bg-card text-foreground shadow-subtle'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            <Icon name={option?.icon} size={14} />
+            <Icon name={option?.icon} size={12} />
             <span className="hidden sm:inline">{option?.label}</span>
           </button>
         ))}
       </div>
       {/* Activity List */}
-      <div className="space-y-4 max-h-96 overflow-y-auto">
+      <div className="space-y-2 sm:space-y-3 max-h-96 overflow-y-auto">
         {filteredActivities?.map((activity) => (
           <div
             key={activity?.id}
-            className="flex items-start space-x-4 p-3 hover:bg-muted/50 rounded-lg transition-smooth"
+            className="flex gap-3 p-2 sm:p-3 hover:bg-muted/50 rounded-lg transition-smooth min-w-0"
           >
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${activity?.color}`}>
-              <Icon name={activity?.icon} size={16} />
+            <div className={`w-8 sm:w-10 h-8 sm:h-10 rounded-full flex items-center justify-center flex-shrink-0 ${activity?.color}`}>
+              <Icon name={activity?.icon} size={14} />
             </div>
             
             <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between mb-1">
-                <h4 className="font-body font-medium text-foreground">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 mb-1">
+                <h4 className="font-body font-medium text-foreground text-sm truncate">
                   {activity?.title}
                 </h4>
                 {activity?.amount && (
-                  <span className={`font-data text-sm font-semibold ${
+                  <span className={`font-data text-xs sm:text-sm font-semibold flex-shrink-0 ${
                     activity?.amount?.startsWith('-') ? 'text-destructive' : 'text-success'
                   }`}>
                     {activity?.amount}
@@ -251,15 +252,15 @@ const ActivityFeed = () => {
                 )}
               </div>
               
-              <p className="font-caption text-sm text-muted-foreground mb-2">
+              <p className="font-caption text-xs sm:text-sm text-muted-foreground mb-2 line-clamp-2">
                 {activity?.description}
               </p>
               
-              <div className="flex items-center justify-between">
-                <span className="font-caption text-xs text-muted-foreground">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-xs">
+                <span className="font-caption text-muted-foreground truncate">
                   by {activity?.user}
                 </span>
-                <span className="font-caption text-xs text-muted-foreground">
+                <span className="font-caption text-muted-foreground">
                   {formatTime(activity?.timestamp)}
                 </span>
               </div>
@@ -268,21 +269,22 @@ const ActivityFeed = () => {
         ))}
       </div>
       {filteredActivities?.length === 0 && (
-        <div className="text-center py-8">
-          <Icon name="Inbox" size={48} className="text-muted-foreground mx-auto mb-4" />
-          <p className="font-body text-muted-foreground mb-2">No activities found</p>
-          <p className="font-caption text-sm text-muted-foreground">
+        <div className="text-center py-6 sm:py-8">
+          <Icon name="Inbox" size={40} className="text-muted-foreground mx-auto mb-3" />
+          <p className="font-body text-muted-foreground mb-2 text-sm">No activities found</p>
+          <p className="font-caption text-xs sm:text-sm text-muted-foreground">
             Try adjusting your filter settings
           </p>
         </div>
       )}
-      <div className="mt-4 pt-4 border-t border-border">
+      <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-border">
         <Button
           variant="ghost"
           fullWidth
           iconName="ExternalLink"
           iconPosition="right"
           onClick={() => navigate('/sales-reports')}
+          className="text-xs sm:text-sm"
         >
           View Full Activity Log
         </Button>

@@ -97,10 +97,10 @@ const LowStockAlert = () => {
 
   return (
     <div className="bg-card border border-border rounded-lg p-6 shadow-subtle">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-2">
-          <Icon name="AlertTriangle" size={20} className="text-warning" />
-          <h3 className="font-heading text-lg font-semibold text-foreground">Low Stock Alerts</h3>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
+        <div className="flex flex-wrap items-center gap-2">
+          <Icon name="AlertTriangle" size={20} className="text-warning flex-shrink-0" />
+          <h3 className="font-heading text-base sm:text-lg font-semibold text-foreground">Low Stock Alerts</h3>
           <span className="bg-warning/20 text-warning px-2 py-1 rounded-full font-data text-xs font-medium">
             {loading ? '...' : visibleAlerts?.length}
           </span>
@@ -111,52 +111,54 @@ const LowStockAlert = () => {
           iconName="Settings"
           iconPosition="left"
           onClick={fetchLowStock}
+          className="text-xs sm:text-sm whitespace-nowrap"
         >
           Refresh
         </Button>
       </div>
-      <div className="space-y-3 max-h-96 overflow-y-auto">
+      <div className="space-y-2 sm:space-y-3 max-h-96 overflow-y-auto">
         {visibleAlerts?.map((item) => (
           <div
             key={item?.id}
-            className="flex items-center space-x-4 p-4 bg-muted/30 border border-border/50 rounded-lg hover:bg-muted/50 transition-smooth"
+            className="flex gap-3 p-3 sm:p-4 bg-muted/30 border border-border/50 rounded-lg hover:bg-muted/50 transition-smooth min-w-0"
           >
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${getPriorityColor(item?.priority)}`}>
-              <Icon name={getPriorityIcon(item?.priority)} size={16} />
+            <div className={`w-8 sm:w-10 h-8 sm:h-10 rounded-full flex items-center justify-center flex-shrink-0 ${getPriorityColor(item?.priority)}`}>
+              <Icon name={getPriorityIcon(item?.priority)} size={14} />
             </div>
             
             <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between mb-1">
-                <h4 className="font-body font-medium text-foreground truncate">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-1">
+                <h4 className="font-body font-medium text-foreground text-sm truncate">
                   {item?.name}
                 </h4>
                 <div className="flex items-center space-x-2">
-                  <span className="font-data text-sm text-destructive font-semibold">
+                  <span className="font-data text-xs sm:text-sm text-destructive font-semibold">
                     {item?.currentStock} left
                   </span>
                 </div>
               </div>
               
-              <div className="flex items-center justify-between mb-2">
-                <p className="font-caption text-xs text-muted-foreground">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-2 text-xs">
+                <p className="font-caption text-muted-foreground">
                   SKU: {item?.sku}
                 </p>
-                <p className="font-caption text-xs text-muted-foreground">
+                <p className="font-caption text-muted-foreground">
                   Min: {item?.minStock}
                 </p>
               </div>
               
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <span className="font-caption text-xs text-muted-foreground">
                   {item?.category}
                 </span>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center gap-1 flex-wrap">
                   <Button
                     variant="outline"
                     size="xs"
                     iconName="ShoppingCart"
                     iconPosition="left"
                     onClick={() => handleReorder(item)}
+                    className="text-xs"
                   >
                     Reorder
                   </Button>
@@ -174,8 +176,8 @@ const LowStockAlert = () => {
           </div>
         ))}
       </div>
-      <div className="mt-4 pt-4 border-t border-border">
-        <div className="flex items-center justify-between">
+      <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-border">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <p className="font-caption text-xs text-muted-foreground">
             Last updated: {new Date()?.toLocaleTimeString()}
           </p>
@@ -185,6 +187,7 @@ const LowStockAlert = () => {
             iconName="RefreshCw"
             iconPosition="left"
             onClick={() => console.log('Refresh alerts')}
+            className="text-xs sm:text-sm whitespace-nowrap"
           >
             Refresh
           </Button>

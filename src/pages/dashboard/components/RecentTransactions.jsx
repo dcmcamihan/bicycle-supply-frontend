@@ -130,11 +130,11 @@ const RecentTransactions = () => {
   };
 
   return (
-    <div className="bg-card border border-border rounded-lg p-6 shadow-subtle">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-2">
-          <Icon name="Clock" size={20} className="text-primary" />
-          <h3 className="font-heading text-lg font-semibold text-foreground">Recent Transactions</h3>
+    <div className="bg-card border border-border rounded-lg p-4 sm:p-6 shadow-subtle w-full overflow-hidden">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
+        <div className="flex items-center space-x-2 min-w-0">
+          <Icon name="Clock" size={20} className="text-primary flex-shrink-0" />
+          <h3 className="font-heading text-base sm:text-lg font-semibold text-foreground truncate">Recent Transactions</h3>
         </div>
         <Button
           variant="ghost"
@@ -142,39 +142,40 @@ const RecentTransactions = () => {
           iconName="ExternalLink"
           iconPosition="right"
           onClick={loadRecent}
+          className="text-xs sm:text-sm whitespace-nowrap"
         >
           {loading ? 'Loading...' : 'Refresh'}
         </Button>
       </div>
-      <div className="space-y-4">
+      <div className="space-y-2 sm:space-y-3 overflow-x-auto">
         {displayedTransactions?.map((transaction) => (
           <div
             key={transaction?.id}
-            className="flex items-center space-x-4 p-3 bg-muted/50 rounded-lg hover:bg-muted transition-smooth"
+            className="flex items-start sm:items-center gap-3 p-2 sm:p-3 bg-muted/50 rounded-lg hover:bg-muted transition-smooth min-w-0"
           >
-            <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-              <Icon name={getPaymentIcon(transaction?.paymentMethod)} size={16} className="text-primary" />
+            <div className="w-8 sm:w-10 h-8 sm:h-10 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
+              <Icon name={getPaymentIcon(transaction?.paymentMethod)} size={14} className="text-primary" />
             </div>
             
             <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between mb-1">
-                <h4 className="font-body font-medium text-foreground truncate">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 mb-1">
+                <h4 className="font-body font-medium text-foreground text-sm truncate">
                   {transaction?.customer}
                 </h4>
-                <span className="font-data text-sm font-semibold text-foreground">
+                <span className="font-data text-xs sm:text-sm font-semibold text-foreground">
                   ₱{transaction?.amount?.toFixed(2)}
                 </span>
               </div>
               
-              <div className="flex items-center justify-between">
-                <p className="font-caption text-xs text-muted-foreground truncate">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                <p className="font-caption text-xs text-muted-foreground line-clamp-1">
                   {transaction?.items}
                 </p>
-                <div className="flex items-center space-x-2">
-                  <span className={`font-caption text-xs capitalize ${getStatusColor(transaction?.status)}`}>
+                <div className="flex items-center space-x-2 text-xs">
+                  <span className={`font-caption capitalize ${getStatusColor(transaction?.status)}`}>
                     {transaction?.status}
                   </span>
-                  <span className="font-caption text-xs text-muted-foreground">
+                  <span className="font-caption text-muted-foreground">
                     {formatTime(transaction?.timestamp)}
                   </span>
                 </div>
@@ -184,13 +185,14 @@ const RecentTransactions = () => {
         ))}
       </div>
       {transactions?.length > 3 && (
-        <div className="mt-4 pt-4 border-t border-border">
+        <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-border">
           <Button
             variant="ghost"
             fullWidth
             onClick={() => setShowAll(!showAll)}
             iconName={showAll ? "ChevronUp" : "ChevronDown"}
             iconPosition="right"
+            className="text-xs sm:text-sm"
           >
             {showAll ? 'Show Less' : `Show ${transactions?.length - 3} More`}
           </Button>

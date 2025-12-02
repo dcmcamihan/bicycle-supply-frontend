@@ -209,24 +209,25 @@ const CategoryChart = ({ data, title = "Category Performance", dateRange, onData
   };
 
   return (
-    <div className="bg-card border border-border rounded-lg p-6 shadow-subtle">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
-        <div>
-          <h2 className="font-heading text-lg font-bold text-foreground mb-1">
+    <div className="bg-card border border-border rounded-lg p-4 sm:p-6 shadow-subtle w-full overflow-hidden">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
+        <div className="min-w-0">
+          <h2 className="font-heading text-base sm:text-lg font-bold text-foreground mb-1 truncate">
             {title}
           </h2>
-          <p className="font-body text-sm text-muted-foreground">
+          <p className="font-body text-xs sm:text-sm text-muted-foreground line-clamp-1">
             Sales distribution by product category
           </p>
         </div>
         
-        <div className="flex bg-muted rounded-lg p-1 mt-4 sm:mt-0">
+        <div className="flex bg-muted rounded-lg p-1 flex-shrink-0">
           <Button
             variant={viewType === 'pie' ? 'default' : 'ghost'}
             size="xs"
             onClick={() => setViewType('pie')}
             iconName="PieChart"
-            iconSize={14}
+            iconSize={12}
+            className="text-xs"
           >
             Pie
           </Button>
@@ -235,16 +236,17 @@ const CategoryChart = ({ data, title = "Category Performance", dateRange, onData
             size="xs"
             onClick={() => setViewType('bar')}
             iconName="BarChart3"
-            iconSize={14}
+            iconSize={12}
+            className="text-xs"
           >
             Bar
           </Button>
         </div>
       </div>
-      <div className="flex flex-col lg:flex-row gap-6">
+      <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
         {/* Chart */}
         <div
-          className="flex-1 overflow-auto"
+          className="flex-1 overflow-x-auto min-w-0"
           aria-label="Category Performance Chart"
           style={{
             height: viewType === 'bar'
@@ -254,14 +256,14 @@ const CategoryChart = ({ data, title = "Category Performance", dateRange, onData
         >
           <ResponsiveContainer width="100%" height="100%">
             {viewType === 'pie' ? (
-              <PieChart>
+              <PieChart margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
                 <Pie
                   data={categoryData}
                   cx="50%"
                   cy="50%"
                   labelLine={false}
                   label={renderCustomLabel}
-                  outerRadius={100}
+                  outerRadius={80}
                   fill="#8884d8"
                   dataKey="value"
                 >
@@ -272,37 +274,39 @@ const CategoryChart = ({ data, title = "Category Performance", dateRange, onData
                 <Tooltip content={<CustomTooltip />} />
               </PieChart>
             ) : (
-              <BarChart data={categoryData} layout="vertical" margin={{ top: 8, right: 24, bottom: 8, left: 16 }}>
+              <BarChart data={categoryData} layout="vertical" margin={{ top: 5, right: 10, bottom: 5, left: 100 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                 <XAxis 
                   type="number" 
                   domain={[0, (Math.max(0, ...categoryData.map(c => c.value)) || 1) * 1.1]}
                   allowDecimals={false}
                   stroke="var(--color-muted-foreground)"
-                  fontSize={12}
+                  fontSize={10}
                   fontFamily="Source Sans Pro"
                   tickFormatter={formatCurrency}
+                  tick={{ fontSize: 9 }}
                 />
                 <YAxis 
                   type="category" 
                   dataKey="name" 
                   interval={0}
-                  width={140}
+                  width={90}
                   stroke="var(--color-muted-foreground)"
-                  fontSize={12}
+                  fontSize={10}
                   fontFamily="Source Sans Pro"
+                  tick={{ fontSize: 9 }}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Bar 
                   dataKey="value" 
                   radius={[0, 4, 4, 0]}
-                  barSize={categoryData.length > 12 ? 16 : 22}
+                  barSize={categoryData.length > 12 ? 12 : 18}
                   barCategoryGap={categoryData.length > 12 ? '8%' : '12%'}
                 >
                   {categoryData?.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry?.color} />
                   ))}
-                  <LabelList dataKey="value" position="right" formatter={(v) => formatCurrency(v)} fill="var(--color-foreground)" fontSize={11} />
+                  <LabelList dataKey="value" position="right" formatter={(v) => formatCurrency(v)} fill="var(--color-foreground)" fontSize={9} />
                 </Bar>
               </BarChart>
             )}
@@ -310,33 +314,35 @@ const CategoryChart = ({ data, title = "Category Performance", dateRange, onData
         </div>
 
         {/* Legend */}
-        <div className="lg:w-64 space-y-3">
-          <h3 className="font-body font-medium text-sm text-foreground mb-3">
+        <div className="lg:w-64 space-y-2 sm:space-y-3">
+          <h3 className="font-body font-medium text-xs sm:text-sm text-foreground mb-3">
             Category Breakdown
           </h3>
-          {categoryData?.map((category, index) => (
-            <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-              <div className="flex items-center space-x-3">
-                <div 
-                  className="w-4 h-4 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: category?.color }}
-                ></div>
-                <div>
-                  <p className="font-body text-sm font-medium text-foreground">
-                    {category?.name}
-                  </p>
-                  <p className="font-caption text-xs text-muted-foreground">
-                    {category?.percentage?.toFixed(2)}% of total
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {categoryData?.map((category, index) => (
+              <div key={index} className="flex items-start sm:items-center justify-between gap-2 p-2 sm:p-3 bg-muted rounded-lg">
+                <div className="flex items-start sm:items-center gap-2 min-w-0">
+                  <div 
+                    className="w-3 h-3 sm:w-4 sm:h-4 rounded-full flex-shrink-0 mt-1 sm:mt-0"
+                    style={{ backgroundColor: category?.color }}
+                  ></div>
+                  <div className="min-w-0">
+                    <p className="font-body text-xs sm:text-sm font-medium text-foreground truncate">
+                      {category?.name}
+                    </p>
+                    <p className="font-caption text-xs text-muted-foreground">
+                      {category?.percentage?.toFixed(2)}% of total
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <p className="font-body text-xs sm:text-sm font-bold text-foreground">
+                    {formatCurrency(category?.value)}
                   </p>
                 </div>
               </div>
-              <div className="text-right">
-                <p className="font-body text-sm font-bold text-foreground">
-                  {formatCurrency(category?.value)}
-                </p>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     </div>

@@ -55,25 +55,26 @@ const SalesChart = ({ data, title = "Sales Trends", timeframe: timeframeProp, on
   };
 
   return (
-    <div className="bg-card border border-border rounded-lg p-6 shadow-subtle">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
-        <div>
-          <h2 className="font-heading text-lg font-bold text-foreground mb-1">
+    <div className="bg-card border border-border rounded-lg p-4 sm:p-6 shadow-subtle w-full overflow-hidden">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
+        <div className="min-w-0">
+          <h2 className="font-heading text-base sm:text-lg font-bold text-foreground mb-1 truncate">
             {title}
           </h2>
-          <p className="font-body text-sm text-muted-foreground">
+          <p className="font-body text-xs sm:text-sm text-muted-foreground line-clamp-1">
             Revenue and transaction patterns over time
           </p>
         </div>
         
-        <div className="flex items-center space-x-2 mt-4 sm:mt-0">
+        <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0">
           <div className="flex bg-muted rounded-lg p-1">
             <Button
               variant={chartType === 'line' ? 'default' : 'ghost'}
               size="xs"
               onClick={() => setChartType('line')}
               iconName="TrendingUp"
-              iconSize={14}
+              iconSize={12}
+              className="text-xs"
             >
               Line
             </Button>
@@ -82,7 +83,8 @@ const SalesChart = ({ data, title = "Sales Trends", timeframe: timeframeProp, on
               size="xs"
               onClick={() => setChartType('bar')}
               iconName="BarChart3"
-              iconSize={14}
+              iconSize={12}
+              className="text-xs"
             >
               Bar
             </Button>
@@ -95,7 +97,7 @@ const SalesChart = ({ data, title = "Sales Trends", timeframe: timeframeProp, on
               if (onTimeframeChange) onTimeframeChange(v);
               else setLocalTimeframe(v);
             }}
-            className="px-3 py-1 bg-input border border-border rounded-lg font-body text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            className="px-2 sm:px-3 py-1 bg-input border border-border rounded-lg font-body text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           >
             <option value="hourly">Hourly</option>
             <option value="daily">Daily</option>
@@ -104,27 +106,30 @@ const SalesChart = ({ data, title = "Sales Trends", timeframe: timeframeProp, on
           </select>
         </div>
       </div>
-      <div className="h-80 w-full" aria-label="Sales Trends Chart">
+      <div className="h-64 sm:h-80 w-full overflow-x-auto" aria-label="Sales Trends Chart">
         <ResponsiveContainer width="100%" height="100%">
           {chartType === 'line' ? (
-            <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+            <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
               <XAxis 
                 dataKey="name" 
                 stroke="var(--color-muted-foreground)"
-                fontSize={12}
+                fontSize={10}
                 fontFamily="Source Sans Pro"
+                tick={{ fontSize: 10 }}
               />
               <YAxis 
                 stroke="var(--color-muted-foreground)"
-                fontSize={12}
+                fontSize={10}
                 fontFamily="Source Sans Pro"
                 tickFormatter={formatCurrency}
+                width={40}
+                tick={{ fontSize: 10 }}
               />
               <Tooltip content={<CustomTooltip />} />
               <Legend 
                 wrapperStyle={{ 
-                  fontSize: '12px', 
+                  fontSize: '11px', 
                   fontFamily: 'Source Sans Pro',
                   color: 'var(--color-foreground)'
                 }}
@@ -133,9 +138,9 @@ const SalesChart = ({ data, title = "Sales Trends", timeframe: timeframeProp, on
                 type="monotone" 
                 dataKey="sales" 
                 stroke="var(--color-primary)" 
-                strokeWidth={3}
-                dot={{ fill: 'var(--color-primary)', strokeWidth: 2, r: 4 }}
-                activeDot={{ r: 6, stroke: 'var(--color-primary)', strokeWidth: 2 }}
+                strokeWidth={2}
+                dot={{ fill: 'var(--color-primary)', strokeWidth: 2, r: 3 }}
+                activeDot={{ r: 5, stroke: 'var(--color-primary)', strokeWidth: 2 }}
                 name="Sales Revenue"
               />
               <Line 
@@ -148,24 +153,27 @@ const SalesChart = ({ data, title = "Sales Trends", timeframe: timeframeProp, on
               />
             </LineChart>
           ) : (
-            <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+            <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
               <XAxis 
                 dataKey="name" 
                 stroke="var(--color-muted-foreground)"
-                fontSize={12}
+                fontSize={10}
                 fontFamily="Source Sans Pro"
+                tick={{ fontSize: 10 }}
               />
               <YAxis 
                 stroke="var(--color-muted-foreground)"
-                fontSize={12}
+                fontSize={10}
                 fontFamily="Source Sans Pro"
                 tickFormatter={formatCurrency}
+                width={40}
+                tick={{ fontSize: 10 }}
               />
               <Tooltip content={<CustomTooltip />} />
               <Legend 
                 wrapperStyle={{ 
-                  fontSize: '12px', 
+                  fontSize: '11px', 
                   fontFamily: 'Source Sans Pro',
                   color: 'var(--color-foreground)'
                 }}

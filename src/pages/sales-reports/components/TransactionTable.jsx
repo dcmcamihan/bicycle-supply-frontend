@@ -244,89 +244,90 @@ const TransactionTable = ({ transactions }) => {
   };
 
   return (
-    <div className="bg-card border border-border rounded-lg shadow-subtle">
+    <div className="bg-card border border-border rounded-lg shadow-subtle w-full overflow-hidden">
       {/* Header */}
-      <div className="p-6 border-b border-border">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div>
-            <h2 className="font-heading text-lg font-bold text-foreground mb-1">
+      <div className="p-4 sm:p-6 border-b border-border">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 sm:gap-4">
+          <div className="min-w-0">
+            <h2 className="font-heading text-base sm:text-lg font-bold text-foreground mb-1 truncate">
               Transaction History
             </h2>
-            <p className="font-body text-sm text-muted-foreground">
+            <p className="font-body text-xs sm:text-sm text-muted-foreground line-clamp-1">
               Detailed view of all sales transactions
             </p>
           </div>
           
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 flex-shrink-0">
             <Input
               type="search"
-              placeholder="Search transactions..."
+              placeholder="Search..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e?.target?.value)}
-              className="w-full sm:w-64"
+              className="w-full sm:w-64 text-xs sm:text-sm"
             />
             
             <Select
-              placeholder="Filter by payment"
+              placeholder="Payment"
               options={paymentMethodOptions}
               value={filterPayment}
               onChange={setFilterPayment}
-              className="w-full sm:w-48"
+              className="w-full sm:w-48 text-xs sm:text-sm"
             />
           </div>
         </div>
       </div>
       {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full">
+      <div className="overflow-x-auto w-full">
+        <table className="w-full text-xs sm:text-sm">
           <thead className="bg-muted">
             <tr>
-              <th className="text-left p-4 font-body font-medium text-sm text-foreground">
+              <th className="text-left p-2 sm:p-4 font-body font-medium text-xs sm:text-sm text-foreground">
                 <button
                   onClick={() => handleSort('id')}
-                  className="flex items-center space-x-1 hover:text-primary transition-micro"
+                  className="flex items-center gap-1 hover:text-primary transition-micro whitespace-nowrap"
                 >
-                  <span>Transaction ID</span>
-                  <Icon name={getSortIcon('id')} size={14} />
+                  <span className="hidden sm:inline">Transaction ID</span>
+                  <span className="sm:hidden">ID</span>
+                  <Icon name={getSortIcon('id')} size={12} />
                 </button>
               </th>
-              <th className="text-left p-4 font-body font-medium text-sm text-foreground">
+              <th className="text-left p-2 sm:p-4 font-body font-medium text-xs sm:text-sm text-foreground">
                 <button
                   onClick={() => handleSort('date')}
-                  className="flex items-center space-x-1 hover:text-primary transition-micro"
+                  className="flex items-center gap-1 hover:text-primary transition-micro whitespace-nowrap"
                 >
-                  <span>Date & Time</span>
-                  <Icon name={getSortIcon('date')} size={14} />
+                  <span>Date</span>
+                  <Icon name={getSortIcon('date')} size={12} />
                 </button>
               </th>
-              <th className="text-left p-4 font-body font-medium text-sm text-foreground">
+              <th className="text-left p-2 sm:p-4 font-body font-medium text-xs sm:text-sm text-foreground hidden sm:table-cell">
                 <button
                   onClick={() => handleSort('customer')}
-                  className="flex items-center space-x-1 hover:text-primary transition-micro"
+                  className="flex items-center gap-1 hover:text-primary transition-micro"
                 >
                   <span>Customer</span>
-                  <Icon name={getSortIcon('customer')} size={14} />
+                  <Icon name={getSortIcon('customer')} size={12} />
                 </button>
               </th>
-              <th className="text-left p-4 font-body font-medium text-sm text-foreground">
+              <th className="text-left p-2 sm:p-4 font-body font-medium text-xs sm:text-sm text-foreground hidden md:table-cell">
                 Items
               </th>
-              <th className="text-right p-4 font-body font-medium text-sm text-foreground">
+              <th className="text-right p-2 sm:p-4 font-body font-medium text-xs sm:text-sm text-foreground">
                 <button
                   onClick={() => handleSort('amount')}
-                  className="flex items-center space-x-1 hover:text-primary transition-micro ml-auto"
+                  className="flex items-center gap-1 hover:text-primary transition-micro ml-auto whitespace-nowrap"
                 >
                   <span>Amount</span>
-                  <Icon name={getSortIcon('amount')} size={14} />
+                  <Icon name={getSortIcon('amount')} size={12} />
                 </button>
               </th>
-              <th className="text-left p-4 font-body font-medium text-sm text-foreground">
+              <th className="text-left p-2 sm:p-4 font-body font-medium text-xs sm:text-sm text-foreground hidden sm:table-cell">
                 Payment
               </th>
-              <th className="text-left p-4 font-body font-medium text-sm text-foreground">
+              <th className="text-left p-2 sm:p-4 font-body font-medium text-xs sm:text-sm text-foreground hidden lg:table-cell">
                 Staff
               </th>
-              <th className="text-center p-4 font-body font-medium text-sm text-foreground">
+              <th className="text-center p-2 sm:p-4 font-body font-medium text-xs sm:text-sm text-foreground">
                 Actions
               </th>
             </tr>
@@ -334,14 +335,14 @@ const TransactionTable = ({ transactions }) => {
           <tbody>
             {paginatedTransactions?.map((transaction, index) => (
               <tr key={transaction?.id} className="border-b border-border hover:bg-muted/50 transition-micro">
-                <td className="p-4">
-                  <span className="font-data text-sm text-foreground">
+                <td className="p-2 sm:p-4">
+                  <span className="font-data text-xs sm:text-sm text-foreground truncate block">
                     {transaction?.id}
                   </span>
                 </td>
-                <td className="p-4">
+                <td className="p-2 sm:p-4">
                   <div>
-                    <p className="font-body text-sm text-foreground">
+                    <p className="font-body text-xs sm:text-sm text-foreground">
                       {formatDate(transaction?.date)}
                     </p>
                     {transaction?.time && (
@@ -351,50 +352,52 @@ const TransactionTable = ({ transactions }) => {
                     )}
                   </div>
                 </td>
-                <td className="p-4">
-                  <span className="font-body text-sm text-foreground">
+                <td className="p-2 sm:p-4 hidden sm:table-cell">
+                  <span className="font-body text-xs sm:text-sm text-foreground truncate block">
                     {transaction?.customer}
                   </span>
                 </td>
-                <td className="p-4">
-                  <span className="font-body text-sm text-muted-foreground">
+                <td className="p-2 sm:p-4 hidden md:table-cell">
+                  <span className="font-body text-xs sm:text-sm text-muted-foreground line-clamp-2">
                     {transaction?.items}
                   </span>
                 </td>
-                <td className="p-4 text-right">
-                  <span className="font-body text-sm font-bold text-foreground">
+                <td className="p-2 sm:p-4 text-right">
+                  <span className="font-body text-xs sm:text-sm font-bold text-foreground">
                     {formatCurrency(transaction?.amount)}
                   </span>
                 </td>
-                <td className="p-4">
-                  <span className="font-body text-sm text-foreground">
+                <td className="p-2 sm:p-4 hidden sm:table-cell">
+                  <span className="font-body text-xs sm:text-sm text-foreground truncate block">
                     {transaction?.paymentMethod ? transaction.paymentMethod : 'N/A'}
                   </span>
                 </td>
-                <td className="p-4">
-                  <span className="font-body text-sm text-foreground">
+                <td className="p-2 sm:p-4 hidden lg:table-cell">
+                  <span className="font-body text-xs sm:text-sm text-foreground truncate block">
                     {transaction?.staff}
                   </span>
                 </td>
-                <td className="p-4 text-center">
-                  <div className="flex items-center justify-center space-x-1">
+                <td className="p-2 sm:p-4 text-center">
+                  <div className="flex items-center justify-center gap-1">
                     <Button
                       variant="ghost"
                       size="xs"
                       iconName="Eye"
-                      iconSize={14}
+                      iconSize={12}
                       onClick={() => handleView(transaction)}
+                      className="text-xs"
                     >
-                      View
+                      <span className="hidden sm:inline">View</span>
                     </Button>
                     <Button
                       variant="ghost"
                       size="xs"
                       iconName="Printer"
-                      iconSize={14}
+                      iconSize={12}
                       onClick={() => handlePrint(transaction)}
+                      className="text-xs"
                     >
-                      Print
+                      <span className="hidden sm:inline">Print</span>
                     </Button>
                   </div>
                 </td>

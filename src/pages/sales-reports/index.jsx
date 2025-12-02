@@ -1129,7 +1129,7 @@ const SalesReports = () => {
       <main className={`pt-15 transition-smooth ${
         sidebarCollapsed ? 'lg:pl-16' : 'lg:pl-64'
       }`}>
-        <div className="p-6 max-w-full">
+        <div className="p-4 sm:p-6 lg:p-8 w-full overflow-hidden max-w-full">
           <Breadcrumb />
           
           {/* Report Header */}
@@ -1156,7 +1156,7 @@ const SalesReports = () => {
           <KPICards kpiData={kpiData} />
 
           {/* Charts Section */}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
             <SalesChart 
               data={salesChartData} 
               title="Sales Trends"
@@ -1172,15 +1172,15 @@ const SalesReports = () => {
           </div>
 
           {/* Main Content Grid */}
-          <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 gap-4 sm:gap-6">
             {/* Transaction Table */}
-            <div className="xl:col-span-3 space-y-6">
+            <div className="w-full space-y-4 sm:space-y-6">
               <TransactionTable transactions={transactionsData} key={JSON.stringify(transactionsData)} />
             </div>
           </div>
 
           {/* Additional Reports */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mt-6 sm:mt-8">
             <BestSellers data={bestSellers} />
             <PaymentDistribution data={paymentDistribution} />
             <StaffPerformance data={staffPerformance} />
@@ -1188,7 +1188,7 @@ const SalesReports = () => {
           </div>
 
           {/* Stock Movement */}
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6 mt-6 sm:mt-8">
             <StockMovement movements={stockMovements} />
           </div>
 

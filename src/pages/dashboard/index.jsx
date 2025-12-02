@@ -158,20 +158,20 @@ const Dashboard = () => {
         />
         
         <main className={`pt-15 transition-smooth ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'}`}>
-          <div className="p-6">
+          <div className="p-4 sm:p-6 lg:p-8 w-full overflow-hidden">
             {/* Page Header */}
-            <div className="mb-8">
+            <div className="mb-6 sm:mb-8">
               <Breadcrumb />
-              <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="font-heading text-3xl font-bold text-foreground mb-2">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-4">
+                <div className="min-w-0">
+                  <h1 className="font-heading text-2xl sm:text-3xl font-bold text-foreground mb-2 truncate">
                     Dashboard
                   </h1>
-                  <p className="font-body text-muted-foreground">
+                  <p className="font-body text-sm sm:text-base text-muted-foreground line-clamp-2">
                     Welcome back, {displayName}. Here's what's happening at your bike shop today.
                   </p>
                 </div>
-                <div className="hidden md:flex items-center space-x-4 text-sm text-muted-foreground">
+                <div className="hidden md:flex items-center space-x-4 text-sm text-muted-foreground flex-shrink-0">
                   <div className="flex items-center space-x-2">
                     <Icon name="Calendar" size={16} />
                     <span className="font-caption">
@@ -197,7 +197,7 @@ const Dashboard = () => {
             </div>
 
             {/* Metrics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
               {metricsData?.map((metric, index) => (
                 <MetricsCard
                   key={index}
@@ -212,58 +212,58 @@ const Dashboard = () => {
             </div>
 
             {/* Main Content Grid */}
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
-              {/* Sales Chart - Takes 2 columns on xl screens */}
-              <div className="xl:col-span-2">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
+              {/* Sales Chart - Takes 2 columns on lg screens */}
+              <div className="lg:col-span-2 min-w-0">
                 <SalesChart />
               </div>
               
               {/* Quick Actions - Takes 1 column */}
-              <div>
+              <div className="min-w-0">
                 <QuickActions />
               </div>
             </div>
 
             {/* Secondary Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
               {/* Recent Transactions */}
-              <div>
+              <div className="min-w-0">
                 <RecentTransactions />
               </div>
               
               {/* Low Stock Alerts */}
-              <div>
+              <div className="min-w-0">
                 <LowStockAlert />
               </div>
               
               {/* Activity Feed */}
-              <div>
+              <div className="min-w-0">
                 <ActivityFeed />
               </div>
             </div>
 
             {/* Footer Section */}
-            <div className="mt-12 pt-8 border-t border-border">
-              <div className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0">
+            <div className="mt-8 sm:mt-12 pt-6 sm:pt-8 border-t border-border">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-6">
                 <div className="flex items-center space-x-4">
-                  <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                  <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
                     <Icon name="Bike" size={20} color="white" />
                   </div>
-                  <div>
-                    <p className="font-body font-semibold text-foreground">Jolen's Bicycle Supply</p>
-                    <p className="font-caption text-xs text-muted-foreground">
+                  <div className="min-w-0">
+                    <p className="font-body font-semibold text-foreground truncate">Jolen's Bicycle Supply</p>
+                    <p className="font-caption text-xs text-muted-foreground line-clamp-1">
                       Streamlining bicycle retail operations
                     </p>
                   </div>
                 </div>
                 
-                <div className="flex items-center space-x-6 text-sm text-muted-foreground">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-6 text-sm text-muted-foreground flex-wrap">
                   <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-success rounded-full"></div>
+                    <div className="w-2 h-2 bg-success rounded-full flex-shrink-0"></div>
                     <span className="font-caption">System Online</span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Icon name="Wifi" size={16} />
+                    <Icon name="Wifi" size={16} className="flex-shrink-0" />
                     <span className="font-caption">Connected</span>
                   </div>
                   <div className="font-caption">
