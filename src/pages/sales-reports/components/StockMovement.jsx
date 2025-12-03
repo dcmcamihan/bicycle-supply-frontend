@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import API_ENDPOINTS from '../../../config/api';
+import Icon from '../../../components/AppIcon';
 
 // movements: [{ date, type: 'Supply'|'Stockout'|'Adjustment', remarks, lines: [{product_id, quantity}] }]
 const StockMovement = ({ movements = [], loading = false }) => {
