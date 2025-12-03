@@ -633,7 +633,7 @@ const PointOfSale = () => {
                     />
                   </div>
 
-                  <div className="h-64 sm:h-80 lg:h-[32rem]">
+                  <div className="h-96 sm:h-[28rem] lg:h-[32rem]">
                     <ShoppingCart
                       cartItems={cartItems}
                       onUpdateQuantity={handleUpdateQuantity}
