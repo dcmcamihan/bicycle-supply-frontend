@@ -119,6 +119,10 @@ const InventoryList = () => {
             if (brandObj) brandName = brandObj.brand_name;
           }
 
+          // Get supplier ID from the product supplier map
+          const supplierEntry = productSupplierMap.get(Number(item.product_id));
+          const supplierId = supplierEntry?.supplier_id || null;
+
           return {
             id: item.product_id,
             name: item.product_name,
@@ -143,14 +147,15 @@ const InventoryList = () => {
             image_url: item.image_url || '',
             lastUpdated: '',
             isActive: true,
-            trackInventory: true
+            trackInventory: true,
+            supplierId: supplierId // Add supplier ID so it persists when editing
           };
         })
       );
       setMockProducts(mapped);
     };
     if (rawProducts.length > 0) mapProducts();
-  }, [rawProducts, categories, brands]);
+  }, [rawProducts, categories, brands, productSupplierMap]);
 
   // Suppliers state
   const [mockSuppliers, setMockSuppliers] = useState([]);
@@ -423,10 +428,15 @@ const InventoryList = () => {
           return false;
         }
 
-        // Supplier filter (use latest supplier for product from map)
+        // Supplier filter (use supplier ID from product object first, then fall back to map)
         if (filters?.supplier) {
-          const entry = productSupplierMap.get(Number(product?.id));
-          if (!entry || String(entry.supplier_id) !== String(filters?.supplier)) {
+          let productSupplierId = product?.supplierId;
+          if (!productSupplierId) {
+            // Fallback to map if not in product object
+            const entry = productSupplierMap.get(Number(product?.id));
+            productSupplierId = entry?.supplier_id;
+          }
+          if (!productSupplierId || String(productSupplierId) !== String(filters?.supplier)) {
             return false;
           }
         }
