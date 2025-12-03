@@ -330,19 +330,19 @@ const Sidebar = ({ isCollapsed = false, onToggle, mobileOpen = false, onMobileTo
 
       {/* Mobile Sidebar Overlay and Drawer */}
       {isMobileOpen && (
-        <div className="lg:hidden fixed inset-0 z-1050 pt-15">
-          {/* Backdrop */}
+        <>
+          {/* Backdrop - blocks interaction with page content */}
           <div 
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300"
+            className="lg:hidden fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300 z-1001"
             onClick={() => setIsMobileOpen(false)}
             aria-hidden="true"
           ></div>
           
           {/* Sidebar Drawer */}
-          <aside className="absolute left-0 top-0 bottom-0 w-64 bg-card border-r border-border shadow-lg overflow-y-auto">
+          <aside className="lg:hidden fixed left-0 top-15 bottom-0 w-64 bg-card border-r border-border shadow-lg overflow-y-auto z-1002">
             <SidebarContent />
           </aside>
-        </div>
+        </>
       )}
     </>
   );
