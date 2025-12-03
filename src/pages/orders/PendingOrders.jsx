@@ -124,10 +124,12 @@ const PendingOrders = () => {
     }
   };
 
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-background">
-      <Header onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
-      <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
+      <Header onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)} onMobileSidebarToggle={() => setMobileMenuOpen(!mobileMenuOpen)} />
+      <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} mobileOpen={mobileMenuOpen} onMobileToggle={(isOpen) => setMobileMenuOpen(isOpen)} />
       <main className={`pt-15 transition-smooth ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'}`}>
         <div className="p-4 sm:p-6 max-w-6xl mx-auto">
           <Breadcrumb />

@@ -488,7 +488,7 @@ const SupplierManagement = () => {
                 </div>
               </div>
 
-              <div className="divide-y divide-border">
+              <div className="divide-y divide-border overflow-x-auto">
                 {loading ? (
                   <div className="p-4 text-center text-muted-foreground">Loading...</div>
                 ) : suppliers.length === 0 ? (
@@ -501,10 +501,10 @@ const SupplierManagement = () => {
                       return (s.supplier_name || '').toLowerCase().includes(q) || String(s.supplier_id).includes(q);
                     })
                     .map(supplier => (
-                      <div key={supplier.supplier_id} className={`p-4 ${editingSupplier && editingSupplier.supplier_id === supplier.supplier_id ? 'bg-yellow-50 border-l-4 border-yellow-400' : ''}`}>
-                        <div className="flex items-center justify-between mb-2">
-                          <h3 className="font-medium">{supplier.supplier_name}</h3>
-                          <div className="flex gap-2">
+                      <div key={supplier.supplier_id} className={`p-3 sm:p-4 ${editingSupplier && editingSupplier.supplier_id === supplier.supplier_id ? 'bg-yellow-50 border-l-4 border-yellow-400' : ''} min-w-max sm:min-w-0`}>
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 mb-2">
+                          <h3 className="font-medium truncate">{supplier.supplier_name}</h3>
+                          <div className="flex gap-2 flex-shrink-0">
                             <Button
                               variant="outline"
                               size="sm"
@@ -522,15 +522,15 @@ const SupplierManagement = () => {
                           </div>
                         </div>
                         
-                        <div className="text-sm text-muted-foreground grid grid-cols-1 md:grid-cols-2 gap-2">
-                          <div>
+                        <div className="text-xs sm:text-sm text-muted-foreground grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div className="min-w-0">
                             {supplier.contacts?.map((contact, index) => {
                               const contactType = contactTypes.find(
                                 type => type.contact_type_code === contact.contact_type_code
                               );
                               return (
-                                <p key={index}>
-                                  {contactType?.description}: {contact.contact_value}
+                                <p key={index} className="truncate">
+                                  <span className="inline-block min-w-0">{contactType?.description}: </span>{contact.contact_value}
                                   {contact.is_primary === 'Y' && (
                                     <span className="ml-2 text-xs text-blue-600">(Primary)</span>
                                   )}
@@ -539,8 +539,8 @@ const SupplierManagement = () => {
                             })}
                           </div>
                           {supplier.addresses?.length > 0 && (
-                            <div>
-                              <p>
+                            <div className="min-w-0">
+                              <p className="line-clamp-3">
                   {(supplier.addresses[0].address_line1 || supplier.addresses[0].street)}<br />
                   {supplier.addresses[0].barangay && (<>{supplier.addresses[0].barangay}<br /></>)}
                   {supplier.addresses[0].city}, {supplier.addresses[0].state || supplier.addresses[0].province}<br />
