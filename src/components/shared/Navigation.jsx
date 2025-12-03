@@ -49,14 +49,11 @@ const Navigation = ({ currentView, onViewChange }) => {
            <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg bg-emerald-500 text-black flex-shrink-0">
               <Bike size={18} strokeWidth={2.5} className="sm:w-5 sm:h-5" />
            </div>
-           <span className="text-base sm:text-lg font-bold tracking-tight text-white hidden sm:inline">
+           <span className="text-sm sm:text-lg font-bold tracking-tight text-white">
              Jolens<span className="text-emerald-400">.</span>
            </span>
-           <span className="text-sm sm:text-lg font-bold tracking-tight text-white sm:hidden">
-             J<span className="text-emerald-400">.</span>
-           </span>
         </div>
-        <div className="flex items-center gap-2 sm:gap-6 ml-auto">
+        <div className="flex items-center gap-1 sm:gap-6 ml-auto">
           <button 
             onClick={() => scrollToSection('home')}
             className={`text-xs sm:text-sm font-medium transition px-2 sm:px-0 ${isActive('home') ? 'text-emerald-400' : 'text-gray-400 hover:text-white'}`}
@@ -65,13 +62,13 @@ const Navigation = ({ currentView, onViewChange }) => {
           </button>
           <button 
             onClick={() => scrollToSection('products')}
-            className={`text-xs sm:text-sm font-medium transition px-2 sm:px-0 hidden sm:block cursor-pointer ${isActive('products') ? 'text-emerald-400' : 'text-gray-400 hover:text-white'}`}
+            className={`text-xs sm:text-sm font-medium transition px-2 sm:px-0 cursor-pointer ${isActive('products') ? 'text-emerald-400' : 'text-gray-400 hover:text-white'}`}
           >
             Products
           </button>
           <button 
             onClick={() => scrollToSection('about')}
-            className={`text-xs sm:text-sm font-medium transition px-2 sm:px-0 hidden md:block cursor-pointer ${isActive('about') ? 'text-emerald-400' : 'text-gray-400 hover:text-white'}`}
+            className={`text-xs sm:text-sm font-medium transition px-2 sm:px-0 cursor-pointer ${isActive('about') ? 'text-emerald-400' : 'text-gray-400 hover:text-white'}`}
           >
             About
           </button>
