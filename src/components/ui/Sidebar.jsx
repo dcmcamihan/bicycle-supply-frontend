@@ -331,9 +331,9 @@ const Sidebar = ({ isCollapsed = false, onToggle, mobileOpen = false, onMobileTo
       {/* Mobile Sidebar Overlay and Drawer */}
       {isMobileOpen && (
         <>
-          {/* Backdrop - blocks interaction with page content */}
+          {/* Backdrop - blocks interaction with page content, starts below header */}
           <div 
-            className="lg:hidden fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300 z-1001"
+            className="lg:hidden fixed left-0 right-0 top-15 bottom-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300 z-1001"
             onClick={() => setIsMobileOpen(false)}
             aria-hidden="true"
           ></div>

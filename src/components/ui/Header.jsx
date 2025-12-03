@@ -178,7 +178,7 @@ const Header = ({ onSidebarToggle, onMobileSidebarToggle, user = null }) => {
   }, []);
 
   return (
-    <header className="fixed top-0 left-0 right-0 h-15 bg-card border-b border-border z-1000 shadow-subtle">
+    <header className="fixed top-0 left-0 right-0 h-15 bg-card border-b border-border z-1000 lg:z-1000 shadow-subtle">
       <div className="flex items-center justify-between h-full px-4">
         {/* Left Section - Logo and Sidebar Toggle */}
         <div className="flex items-center space-x-4">
