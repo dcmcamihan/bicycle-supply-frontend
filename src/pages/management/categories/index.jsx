@@ -240,15 +240,15 @@ const CategoryManagement = () => {
 
             {/* Categories List */}
             <div className="bg-card rounded-lg border border-border">
-              <div className="p-4 border-b border-border flex items-center justify-between gap-4">
+              <div className="p-4 border-b border-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <h2 className="text-lg font-semibold">Categories</h2>
-                <div className="ml-auto">
+                <div className="w-full sm:w-auto sm:ml-auto">
                   <input
                     type="search"
                     placeholder="Search categories..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="p-2 border rounded w-64"
+                    className="w-full sm:w-64 p-2 border rounded"
                   />
                 </div>
               </div>
