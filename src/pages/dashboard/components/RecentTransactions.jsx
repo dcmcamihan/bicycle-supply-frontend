@@ -139,8 +139,8 @@ const RecentTransactions = () => {
         <Button
           variant="ghost"
           size="sm"
-          iconName="ExternalLink"
-          iconPosition="right"
+          iconName="RefreshCw"
+          iconPosition="left"
           onClick={loadRecent}
           className="text-xs sm:text-sm whitespace-nowrap"
         >

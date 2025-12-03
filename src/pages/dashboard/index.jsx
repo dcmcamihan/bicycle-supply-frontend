@@ -171,6 +171,28 @@ const Dashboard = () => {
                     Welcome back, {displayName}. Here's what's happening at your bike shop today.
                   </p>
                 </div>
+                <div className="flex md:hidden items-center space-x-3 text-xs text-muted-foreground flex-shrink-0">
+                  <div className="flex items-center space-x-1">
+                    <Icon name="Calendar" size={14} />
+                    <span className="font-caption">
+                      {currentTime?.toLocaleDateString('en-US', { 
+                        weekday: 'short', 
+                        year: 'numeric', 
+                        month: 'short', 
+                        day: 'numeric' 
+                      })}
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <Icon name="Clock" size={14} />
+                    <span className="font-caption">
+                      {currentTime?.toLocaleTimeString('en-US', { 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                      })}
+                    </span>
+                  </div>
+                </div>
                 <div className="hidden md:flex items-center space-x-4 text-sm text-muted-foreground flex-shrink-0">
                   <div className="flex items-center space-x-2">
                     <Icon name="Calendar" size={16} />

@@ -482,7 +482,7 @@ const PointOfSale = () => {
                 </p>
               </div>
               
-              <div className="flex items-center gap-3">
+              <div className="flex items-center justify-end">
                 <div className="text-right">
                   <p className="font-caption text-xs text-muted-foreground">Today's Date</p>
                   <p className="font-data text-xs sm:text-sm text-foreground">

@@ -105,16 +105,6 @@ const LowStockAlert = () => {
             {loading ? '...' : visibleAlerts?.length}
           </span>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          iconName="Settings"
-          iconPosition="left"
-          onClick={fetchLowStock}
-          className="text-xs sm:text-sm whitespace-nowrap"
-        >
-          Refresh
-        </Button>
       </div>
       <div className="space-y-2 sm:space-y-3 max-h-96 overflow-y-auto">
         {visibleAlerts?.map((item) => (
