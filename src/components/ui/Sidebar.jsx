@@ -275,6 +275,10 @@ const Sidebar = ({ isCollapsed = false, onToggle, mobileOpen = false, onMobileTo
                       <Link
                         key={subItem?.path}
                         to={subItem?.path}
+                        onClick={(e) => {
+                          // Prevent event bubbling to prevent parent collapse
+                          e.stopPropagation();
+                        }}
                         className={`flex items-center space-x-3 px-3 py-2 rounded-lg font-body text-sm transition-smooth group relative ${
                           isSubActive
                             ? 'text-primary font-medium bg-primary/10'

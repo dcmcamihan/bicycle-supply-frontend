@@ -250,7 +250,7 @@ const Header = ({ onSidebarToggle, onMobileSidebarToggle, user = null }) => {
             {isNotificationsOpen && (
               <>
                 <div className="fixed inset-0 z-1100" onClick={() => setIsNotificationsOpen(false)}></div>
-                <div className="absolute -right-40 sm:right-0 top-full mt-2 w-80 bg-popover border border-border rounded-lg shadow-raised z-1200 backdrop-glass">
+                <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-80 bg-popover border border-border rounded-lg shadow-raised z-1200 backdrop-glass">
                   <div className="p-3 border-b border-border flex items-center justify-between">
                     <p className="font-body text-sm font-semibold">Notifications</p>
                     <span className="font-caption text-xs text-muted-foreground">{notifications.length || 'No'} recent {notifications.length === 1 ? 'activity' : 'activities'}</span>

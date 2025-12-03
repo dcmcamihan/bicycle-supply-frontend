@@ -38,11 +38,8 @@ const LoginPage = () => {
               <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg bg-emerald-500 text-black flex-shrink-0">
                 <Bike size={18} strokeWidth={2.5} className="sm:w-5 sm:h-5" />
               </div>
-              <span className="text-base sm:text-lg font-bold tracking-tight text-white hidden sm:inline">
+              <span className="text-sm sm:text-lg font-bold tracking-tight text-white">
                 Jolens<span className="text-emerald-400">.</span>
-              </span>
-              <span className="text-sm sm:text-lg font-bold tracking-tight text-white sm:hidden">
-                J<span className="text-emerald-400">.</span>
               </span>
             </button>
             <button 
