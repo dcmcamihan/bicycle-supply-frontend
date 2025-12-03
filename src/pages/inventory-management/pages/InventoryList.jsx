@@ -625,16 +625,19 @@ const InventoryList = () => {
       const newProductId = isEdit ? productId : (savedProduct?.product_id || savedProduct?.id);
 
       // Sync product images via product-images endpoints if provided
-      try {
+      if (newProductId) {
         const urls = Array.isArray(productData.image_urls)
           ? productData.image_urls.filter(u => !!u)
           : (productData.image_url ? [productData.image_url] : []);
 
-        if (newProductId && Array.isArray(urls)) {
-          // Fetch existing images for this product
+        if (Array.isArray(urls) && urls.length > 0) {
           try {
+            // Fetch existing images for this product
             const existingRes = await fetch(API_ENDPOINTS.PRODUCT_IMAGES_BY_PRODUCT(newProductId));
-            const existing = existingRes.ok ? await existingRes.json() : [];
+            if (!existingRes.ok) {
+              throw new Error(`Failed to fetch existing images: ${existingRes.status} ${existingRes.statusText}`);
+            }
+            const existing = await existingRes.json();
 
             const existingByUrl = (existing || []).reduce((acc, img) => {
               if (img && img.image_url) acc[img.image_url] = img;
@@ -644,13 +647,14 @@ const InventoryList = () => {
             // Create any new images not present
             for (const url of urls) {
               if (!existingByUrl[url]) {
-                try {
-                  await fetch(API_ENDPOINTS.PRODUCT_IMAGES, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ product_id: newProductId, image_url: url })
-                  });
-                } catch (e) { /* non-blocking */ }
+                const createRes = await fetch(API_ENDPOINTS.PRODUCT_IMAGES, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ product_id: newProductId, image_url: url })
+                });
+                if (!createRes.ok) {
+                  throw new Error(`Failed to save image "${url}": ${createRes.status} ${createRes.statusText}`);
+                }
               }
             }
 
@@ -658,18 +662,17 @@ const InventoryList = () => {
             if (isEdit) {
               for (const img of existing || []) {
                 if (!urls.includes(img.image_url)) {
-                  try {
-                    await fetch(API_ENDPOINTS.PRODUCT_IMAGE(img.product_image_id), { method: 'DELETE' });
-                  } catch (e) { /* non-blocking */ }
+                  const deleteRes = await fetch(API_ENDPOINTS.PRODUCT_IMAGE(img.product_image_id), { method: 'DELETE' });
+                  if (!deleteRes.ok) {
+                    throw new Error(`Failed to delete image: ${deleteRes.status} ${deleteRes.statusText}`);
+                  }
                 }
               }
             }
           } catch (e) {
-            // ignore image sync failures
+            throw new Error(`Image sync error: ${e.message}`);
           }
         }
-      } catch (e) {
-        // ignore
       }
       // When creating a new product: if initial stock provided and supplier selected,
       // create a supply and a supply_detail so QOH and supplier mapping update correctly

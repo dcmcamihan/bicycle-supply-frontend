@@ -95,6 +95,7 @@ const ProductModal = ({ isOpen, onClose, product = null, onSave, suppliers = [],
       onClose();
     } catch (err) {
       console.error('Error saving product:', err);
+      alert(`Failed to save product: ${err?.message || 'Unknown error'}`);
     } finally {
       setIsLoading(false);
     }
