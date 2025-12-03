@@ -114,27 +114,33 @@ const ProductDetails = () => {
         if (!res.ok) throw new Error('Failed to fetch product');
         const data = await res.json();
 
-        // Fetch category name from categories API
+        // Fetch category, brand, and stock in parallel
+        const [categoryResponse, brandResponse, stockResponse] = await Promise.allSettled([
+          data.category_code ? fetch(API_ENDPOINTS.CATEGORY(data.category_code)) : Promise.resolve(null),
+          data.brand_id ? fetch(API_ENDPOINTS.BRAND(data.brand_id)) : Promise.resolve(null),
+          fetch(`${API_ENDPOINTS.PRODUCT(productId)}/quantity-on-hand`)
+        ]);
+
         let categoryName = '';
-        if (data.category_code) {
+        if (categoryResponse.status === 'fulfilled' && categoryResponse.value) {
           try {
-            const catRes = await fetch(API_ENDPOINTS.CATEGORY(data.category_code));
-            if (catRes.ok) {
-              const catData = await catRes.json();
-              categoryName = catData.category_name || '';
-            }
+            const catData = await categoryResponse.value.json();
+            categoryName = catData.category_name || '';
           } catch {}
         }
 
-        // Fetch brand name from brands API
         let brandName = '';
-        if (data.brand_id) {
+        if (brandResponse.status === 'fulfilled' && brandResponse.value) {
           try {
-            const brandRes = await fetch(API_ENDPOINTS.BRAND(data.brand_id));
-            if (brandRes.ok) {
-              const brandData = await brandRes.json();
-              brandName = brandData.brand_name || '';
-            }
+            const brandData = await brandResponse.value.json();
+            brandName = brandData.brand_name || '';
+          } catch {}
+        }
+
+        let currentStock = 0;
+        if (stockResponse.status === 'fulfilled') {
+          try {
+            currentStock = Number(await stockResponse.value.json()) || 0;
           } catch {}
         }
 
@@ -159,6 +165,9 @@ const ProductDetails = () => {
             material: data.material ?? prev.material,
             warranty: data.warranty_period ?? prev.warranty,
             image: data.image_url ?? prev.image,
+            stock: currentStock,
+            isActive: data.is_active === 'Y' || data.is_active === true || defaultProduct.isActive,
+            isFeatured: data.is_featured === 'Y' || data.is_featured === true || defaultProduct.isFeatured,
           }
         }));
       } catch (err) {

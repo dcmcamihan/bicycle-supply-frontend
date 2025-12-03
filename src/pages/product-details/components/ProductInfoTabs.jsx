@@ -38,7 +38,7 @@ const ProductInfoTabs = ({ product, isEditing, onToggleEdit, onSave, refreshToke
   }, [product?.id, product?.product_id, refreshToken]);
 
 
-  // Fetch stock movement history (Supplies + Sales)
+  // Fetch stock movement history (Supplies + Sales) - optimized with lazy loading
   React.useEffect(() => {
     const loadMovements = async () => {
       if (!product?.id && !product?.product_id) return;
@@ -46,53 +46,68 @@ const ProductInfoTabs = ({ product, isEditing, onToggleEdit, onSave, refreshToke
       setLoadingMovements(true);
       try {
         const all = [];
-        // Sales -> decreases
-        try {
-          const salesRes = await fetch(API_ENDPOINTS.SALES);
-          if (salesRes.ok) {
-            const sales = await salesRes.json();
-            for (const sale of sales) {
-              try {
-                const detRes = await fetch(API_ENDPOINTS.SALE_DETAILS(sale.sale_id));
-                if (!detRes.ok) continue;
-                const details = await detRes.json();
-                for (const d of details) {
-                  if (Number(d.product_id) === pid) {
-                    all.push({
-                      date: sale.sale_date ? new Date(sale.sale_date).toISOString().slice(0,10) : '',
-                      type: 'Sale',
-                      quantity: -(Number(d.quantity_sold) || 0)
-                    });
-                  }
-                }
-              } catch {}
-            }
-          }
-        } catch {}
+        
+        // Fetch all sales and supplies in parallel
+        const [salesRes, supRes] = await Promise.allSettled([
+          fetch(API_ENDPOINTS.SALES),
+          fetch(API_ENDPOINTS.SUPPLIES)
+        ]);
 
-        // Supplies -> increases
-        try {
-          const supRes = await fetch(API_ENDPOINTS.SUPPLIES);
-          if (supRes.ok) {
-            const supplies = await supRes.json();
-            for (const sup of supplies) {
-              try {
-                const sdetRes = await fetch(API_ENDPOINTS.SUPPLY_DETAILS_BY_SUPPLY(sup.supply_id));
-                if (!sdetRes.ok) continue;
-                const sdetails = await sdetRes.json();
-                for (const sd of sdetails) {
-                  if (Number(sd.product_id) === pid) {
-                    all.push({
-                      date: sup.supply_date ? new Date(sup.supply_date).toISOString().slice(0,10) : '',
-                      type: 'Restock',
-                      quantity: Number(sd.quantity_supplied) || 0
-                    });
-                  }
-                }
-              } catch {}
+        // Process Sales in parallel
+        if (salesRes.status === 'fulfilled' && salesRes.value.ok) {
+          const sales = await salesRes.value.json();
+          const salesDetailsPromises = sales.map(sale => 
+            fetch(API_ENDPOINTS.SALE_DETAILS(sale.sale_id))
+              .then(res => res.ok ? res.json() : [])
+              .then(details => ({
+                saleDate: sale.sale_date,
+                details
+              }))
+              .catch(() => ({ saleDate: null, details: [] }))
+          );
+
+          const salesDetailsResults = await Promise.all(salesDetailsPromises);
+          for (let i = 0; i < sales.length; i++) {
+            const { saleDate, details } = salesDetailsResults[i];
+            for (const d of details) {
+              if (Number(d.product_id) === pid) {
+                all.push({
+                  date: saleDate ? new Date(saleDate).toISOString().slice(0,10) : '',
+                  type: 'Sale',
+                  quantity: -(Number(d.quantity_sold) || 0)
+                });
+              }
             }
           }
-        } catch {}
+        }
+
+        // Process Supplies in parallel
+        if (supRes.status === 'fulfilled' && supRes.value.ok) {
+          const supplies = await supRes.value.json();
+          const suppliesDetailsPromises = supplies.map(sup =>
+            fetch(API_ENDPOINTS.SUPPLY_DETAILS_BY_SUPPLY(sup.supply_id))
+              .then(res => res.ok ? res.json() : [])
+              .then(sdetails => ({
+                supplyDate: sup.supply_date,
+                details: sdetails
+              }))
+              .catch(() => ({ supplyDate: null, details: [] }))
+          );
+
+          const suppliesDetailsResults = await Promise.all(suppliesDetailsPromises);
+          for (let i = 0; i < supplies.length; i++) {
+            const { supplyDate, details } = suppliesDetailsResults[i];
+            for (const sd of details) {
+              if (Number(sd.product_id) === pid) {
+                all.push({
+                  date: supplyDate ? new Date(supplyDate).toISOString().slice(0,10) : '',
+                  type: 'Restock',
+                  quantity: Number(sd.quantity_supplied) || 0
+                });
+              }
+            }
+          }
+        }
 
         // Sort movements by date desc (newest first)
         all.sort((a,b) => new Date(b.date) - new Date(a.date));
@@ -400,17 +415,21 @@ const ProductInfoTabs = ({ product, isEditing, onToggleEdit, onSave, refreshToke
           const supRes = await fetch(API_ENDPOINTS.SUPPLIES);
           if (supRes.ok) {
             const supplies = await supRes.json();
+            const detailsPromises = supplies.map(sup =>
+              fetch(API_ENDPOINTS.SUPPLY_DETAILS_BY_SUPPLY(sup.supply_id))
+                .then(res => res.ok ? res.json() : [])
+                .then(dets => ({ supplier_id: sup.supplier_id, date: new Date(sup.supply_date || 0), dets }))
+                .catch(() => ({ supplier_id: null, date: new Date(0), dets: [] }))
+            );
+
+            const results = await Promise.all(detailsPromises);
             const matches = [];
-            for (const sup of supplies) {
-              try {
-                const detRes = await fetch(API_ENDPOINTS.SUPPLY_DETAILS_BY_SUPPLY(sup.supply_id));
-                if (!detRes.ok) continue;
-                const dets = await detRes.json();
-                if (dets?.some(d => Number(d.product_id) === pid)) {
-                  matches.push({ supplier_id: sup.supplier_id, date: new Date(sup.supply_date || 0) });
-                }
-              } catch {}
+            for (const result of results) {
+              if (result.supplier_id && result.dets?.some(d => Number(d.product_id) === pid)) {
+                matches.push({ supplier_id: result.supplier_id, date: result.date });
+              }
             }
+
             if (matches.length) {
               matches.sort((a, b) => b.date - a.date);
               supplierId = matches[0].supplier_id;
@@ -425,51 +444,51 @@ const ProductInfoTabs = ({ product, isEditing, onToggleEdit, onSave, refreshToke
         return;
       }
 
-      try {
-        const sres = await fetch(API_ENDPOINTS.SUPPLIER(supplierId));
-        let sdata = null;
-        if (sres.ok) {
-          sdata = await sres.json();
-        }
+      // Fetch supplier info and contacts in parallel
+      const [sRes, aRes, cRes] = await Promise.allSettled([
+        fetch(API_ENDPOINTS.SUPPLIER(supplierId)),
+        fetch(API_ENDPOINTS.SUPPLIER_ADDRESSES),
+        fetch(API_ENDPOINTS.SUPPLIER_CONTACTS)
+      ]);
 
-        // Address list -> filter by supplier_id and compose single-line
-        let addressText = '';
-        try {
-          const aRes = await fetch(API_ENDPOINTS.SUPPLIER_ADDRESSES);
-          if (aRes.ok) {
-            const arr = await aRes.json();
-            const addr = arr?.find(a => Number(a.supplier_id) === Number(supplierId));
-            if (addr) {
-              addressText = [addr.street, addr.barangay, addr.city, addr.province, addr.zip_code, addr.country]
-                .filter(Boolean)
-                .join(', ');
-            }
-          }
-        } catch {}
-
-        setSupplierInfo(sdata ? { ...sdata, supplier_address: addressText } : { supplier_id: supplierId, supplier_address: addressText });
-      } catch {
-        setSupplierInfo(null);
+      let sdata = null;
+      if (sRes.status === 'fulfilled' && sRes.value.ok) {
+        sdata = await sRes.value.json();
       }
 
+      // Address list -> filter by supplier_id
+      let addressText = '';
+      if (aRes.status === 'fulfilled' && aRes.value.ok) {
+        try {
+          const arr = await aRes.value.json();
+          const addr = arr?.find(a => Number(a.supplier_id) === Number(supplierId));
+          if (addr) {
+            addressText = [addr.street, addr.barangay, addr.city, addr.province, addr.zip_code, addr.country]
+              .filter(Boolean)
+              .join(', ');
+          }
+        } catch {}
+      }
+
+      setSupplierInfo(sdata ? { ...sdata, supplier_address: addressText } : { supplier_id: supplierId, supplier_address: addressText });
+
       // Contacts list -> filter by supplier_id
-      try {
-        const cres = await fetch(API_ENDPOINTS.SUPPLIER_CONTACTS);
-        if (cres.ok) {
-          const cdata = await cres.json();
+      if (cRes.status === 'fulfilled' && cRes.value.ok) {
+        try {
+          const cdata = await cRes.value.json();
           const filtered = (Array.isArray(cdata) ? cdata : []).filter(c => Number(c.supplier_id) === Number(supplierId));
           setSupplierContacts(filtered);
-        } else {
+        } catch {
           setSupplierContacts([]);
         }
-      } catch {
+      } else {
         setSupplierContacts([]);
       }
     };
     fetchSupplierData();
   }, [product?.id, product?.product_id]);
 
-  // Build purchase order history from supplies + supply_details
+  // Build purchase order history from supplies + supply_details - optimized with parallel fetching
   React.useEffect(() => {
     const loadPoHistory = async () => {
       const pid = Number(product?.id || product?.product_id);
@@ -479,22 +498,26 @@ const ProductInfoTabs = ({ product, isEditing, onToggleEdit, onSave, refreshToke
         const supRes = await fetch(API_ENDPOINTS.SUPPLIES);
         if (supRes.ok) {
           const supplies = await supRes.json();
-          for (const sup of supplies) {
-            try {
-              const detRes = await fetch(API_ENDPOINTS.SUPPLY_DETAILS_BY_SUPPLY(sup.supply_id));
-              if (!detRes.ok) continue;
-              const dets = await detRes.json();
-              const forThisProduct = dets.filter(d => Number(d.product_id) === pid);
-              if (forThisProduct.length > 0) {
-                const totalQty = forThisProduct.reduce((sum, d) => sum + (Number(d.quantity_supplied) || 0), 0);
-                out.push({
-                  poNumber: `SUP-${sup.supply_id}`,
-                  date: sup.supply_date ? new Date(sup.supply_date).toISOString().slice(0,10) : '',
-                  quantity: totalQty,
-                  status: sup.status || 'Received'
-                });
-              }
-            } catch {}
+          const detailsPromises = supplies.map(sup =>
+            fetch(API_ENDPOINTS.SUPPLY_DETAILS_BY_SUPPLY(sup.supply_id))
+              .then(res => res.ok ? res.json() : [])
+              .then(dets => ({ supply_id: sup.supply_id, supply_date: sup.supply_date, status: sup.status || 'Received', dets }))
+              .catch(() => ({ supply_id: null, supply_date: null, status: 'Received', dets: [] }))
+          );
+
+          const resultsArray = await Promise.all(detailsPromises);
+          for (const result of resultsArray) {
+            if (!result.supply_id) continue;
+            const forThisProduct = result.dets.filter(d => Number(d.product_id) === pid);
+            if (forThisProduct.length > 0) {
+              const totalQty = forThisProduct.reduce((sum, d) => sum + (Number(d.quantity_supplied) || 0), 0);
+              out.push({
+                poNumber: `SUP-${result.supply_id}`,
+                date: result.supply_date ? new Date(result.supply_date).toISOString().slice(0,10) : '',
+                quantity: totalQty,
+                status: result.status
+              });
+            }
           }
         }
         // Sort newest first
