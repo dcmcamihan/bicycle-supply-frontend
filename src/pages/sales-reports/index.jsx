@@ -1181,15 +1181,15 @@ const SalesReports = () => {
 
           {/* Additional Reports */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mt-6 sm:mt-8">
-            <BestSellers data={bestSellers} />
-            <PaymentDistribution data={paymentDistribution} />
-            <StaffPerformance data={staffPerformance} />
-            <PeakHours data={peakHours} />
+            <BestSellers data={bestSellers} loading={isLoading} />
+            <PaymentDistribution data={paymentDistribution} loading={isLoading} />
+            <StaffPerformance data={staffPerformance} loading={isLoading} />
+            <PeakHours data={peakHours} loading={isLoading} />
           </div>
 
           {/* Stock Movement */}
           <div className="space-y-4 sm:space-y-6 mt-6 sm:mt-8">
-            <StockMovement movements={stockMovements} />
+            <StockMovement movements={stockMovements} loading={isLoading} />
           </div>
 
           {/* Loading Overlay */}

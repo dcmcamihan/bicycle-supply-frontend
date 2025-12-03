@@ -1,7 +1,7 @@
 import React from 'react';
 import Icon from '../../../components/AppIcon';
 
-const PeakHours = ({ data = [] }) => {
+const PeakHours = ({ data = [], loading = false }) => {
   const formatHour = (h) => {
     if (h === undefined || h === null) return '';
     const date = new Date();
@@ -15,8 +15,16 @@ const PeakHours = ({ data = [] }) => {
         <Icon name="Clock" size={20} className="text-warning" />
         <h3 className="font-heading text-lg font-semibold text-foreground">Peak Hours</h3>
       </div>
-      {(!data || data.length === 0) ? (
-        <p className="font-caption text-sm text-muted-foreground">No data for selected range.</p>
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-8">
+          <Icon name="Loader" size={32} className="animate-spin text-warning mb-2" />
+          <p className="font-body text-sm text-muted-foreground">Loading data...</p>
+        </div>
+      ) : !data || data.length === 0 ? (
+        <div className="text-center py-8">
+          <Icon name="Clock" size={40} className="text-muted-foreground mx-auto mb-3" />
+          <p className="font-body text-muted-foreground text-sm">No data for selected range.</p>
+        </div>
       ) : (
         <div className="space-y-3">
           {data.map((h, idx) => (

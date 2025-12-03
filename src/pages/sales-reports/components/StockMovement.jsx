@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import API_ENDPOINTS from '../../../config/api';
 
 // movements: [{ date, type: 'Supply'|'Stockout'|'Adjustment', remarks, lines: [{product_id, quantity}] }]
-const StockMovement = ({ movements = [] }) => {
+const StockMovement = ({ movements = [], loading = false }) => {
   const [page, setPage] = useState(1);
   const [expanded, setExpanded] = useState({});
   const [productsById, setProductsById] = useState({}); // cache: { [id]: { product_name, ... } }
@@ -88,8 +88,16 @@ const StockMovement = ({ movements = [] }) => {
         <div className="text-sm text-muted-foreground">{movements.length} movement{movements.length === 1 ? '' : 's'}</div>
       </div>
 
-      {movements.length === 0 ? (
-        <div className="text-sm text-muted-foreground mt-4">No stock movements found.</div>
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-12">
+          <Icon name="Loader" size={32} className="animate-spin text-primary mb-2" />
+          <p className="font-body text-sm text-muted-foreground">Loading movements...</p>
+        </div>
+      ) : movements.length === 0 ? (
+        <div className="text-center py-8 mt-4">
+          <Icon name="Package" size={40} className="text-muted-foreground mx-auto mb-3" />
+          <p className="font-body text-muted-foreground text-sm">No stock movements found.</p>
+        </div>
       ) : (
         <div className="overflow-x-auto mt-4">
           <table className="min-w-full text-sm">

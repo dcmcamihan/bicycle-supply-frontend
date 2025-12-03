@@ -1,15 +1,23 @@
 import React from 'react';
 import Icon from '../../../components/AppIcon';
 
-const StaffPerformance = ({ data = [] }) => {
+const StaffPerformance = ({ data = [], loading = false }) => {
   return (
     <div className="bg-card border border-border rounded-lg p-6 shadow-subtle">
       <div className="flex items-center space-x-2 mb-4">
         <Icon name="Users" size={20} className="text-secondary" />
         <h3 className="font-heading text-lg font-semibold text-foreground">Staff Performance</h3>
       </div>
-      {(!data || data.length === 0) ? (
-        <p className="font-caption text-sm text-muted-foreground">No data for selected range.</p>
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-8">
+          <Icon name="Loader" size={32} className="animate-spin text-secondary mb-2" />
+          <p className="font-body text-sm text-muted-foreground">Loading data...</p>
+        </div>
+      ) : !data || data.length === 0 ? (
+        <div className="text-center py-8">
+          <Icon name="Users" size={40} className="text-muted-foreground mx-auto mb-3" />
+          <p className="font-body text-muted-foreground text-sm">No data for selected range.</p>
+        </div>
       ) : (
         <div className="space-y-3">
           {data.map((s, idx) => (

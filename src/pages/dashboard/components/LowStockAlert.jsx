@@ -107,7 +107,18 @@ const LowStockAlert = () => {
         </div>
       </div>
       <div className="space-y-2 sm:space-y-3 max-h-96 overflow-y-auto">
-        {visibleAlerts?.map((item) => (
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-12">
+            <Icon name="Loader" size={32} className="animate-spin text-primary mb-2" />
+            <p className="font-body text-sm text-muted-foreground">Loading alerts...</p>
+          </div>
+        ) : visibleAlerts?.length === 0 ? (
+          <div className="text-center py-8">
+            <Icon name="AlertCircle" size={40} className="text-muted-foreground mx-auto mb-3" />
+            <p className="font-body text-muted-foreground text-sm">No alerts to show</p>
+          </div>
+        ) : (
+          visibleAlerts?.map((item) => (
           <div
             key={item?.id}
             className="flex gap-3 p-3 sm:p-4 bg-muted/30 border border-border/50 rounded-lg hover:bg-muted/50 transition-smooth min-w-0"
@@ -164,7 +175,8 @@ const LowStockAlert = () => {
               </div>
             </div>
           </div>
-        ))}
+        ))
+      )}
       </div>
       <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-border">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">

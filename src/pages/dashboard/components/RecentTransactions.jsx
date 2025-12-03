@@ -148,7 +148,18 @@ const RecentTransactions = () => {
         </Button>
       </div>
       <div className="space-y-2 sm:space-y-3 overflow-x-auto">
-        {displayedTransactions?.map((transaction) => (
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-12">
+            <Icon name="Loader" size={32} className="animate-spin text-primary mb-2" />
+            <p className="font-body text-sm text-muted-foreground">Loading transactions...</p>
+          </div>
+        ) : displayedTransactions?.length === 0 ? (
+          <div className="text-center py-8">
+            <Icon name="TrendingDown" size={40} className="text-muted-foreground mx-auto mb-3" />
+            <p className="font-body text-muted-foreground text-sm">No transactions yet</p>
+          </div>
+        ) : (
+          displayedTransactions?.map((transaction) => (
           <div
             key={transaction?.id}
             className="flex items-start sm:items-center gap-3 p-2 sm:p-3 bg-muted/50 rounded-lg hover:bg-muted transition-smooth min-w-0"
@@ -182,7 +193,8 @@ const RecentTransactions = () => {
               </div>
             </div>
           </div>
-        ))}
+        ))
+      )}
       </div>
       {transactions?.length > 3 && (
         <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-border">
