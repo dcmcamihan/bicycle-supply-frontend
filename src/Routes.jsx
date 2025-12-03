@@ -15,7 +15,6 @@ import SignupPage from './pages/signup';
 import LandingPage from './pages/landing';
 import ForgotPassword from './pages/auth/ForgotPassword';
 import ResetPassword from './pages/auth/ResetPassword';
-import ProductDetails from './pages/product-details';
 import Dashboard from './pages/dashboard';
 import SalesReports from './pages/sales-reports';
 import PointOfSale from './pages/point-of-sale';
@@ -54,8 +53,7 @@ const Routes = () => {
           <Route path="/reset-password" element={<ResetPassword />} />
           {/* Private */}
           <Route path="/dashboard" element={<PrivateRoute element={<Dashboard />} />} />
-          <Route path="/inventory-management" element={<PrivateRoute element={<InventoryManagement />} />} />
-          <Route path="/product-details" element={<PrivateRoute element={<ProductDetails />} />} />
+          <Route path="/inventory-management/*" element={<PrivateRoute element={<InventoryManagement />} />} />
           <Route path="/sales-reports" element={<PrivateRoute element={<SalesReports />} />} />
           <Route path="/point-of-sale" element={<PrivateRoute element={<PointOfSale />} />} />
           <Route path="/orders/pending" element={<PrivateRoute element={<PendingOrders />} />} />

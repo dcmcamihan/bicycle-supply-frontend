@@ -86,7 +86,7 @@ const Sidebar = ({ isCollapsed = false, onToggle, mobileOpen = false, onMobileTo
       subItems: [
         {
           label: 'Product Details',
-          path: '/product-details',
+          path: '/inventory-management/product-details',
           icon: 'Info'
         }
       ]
@@ -107,8 +107,8 @@ const Sidebar = ({ isCollapsed = false, onToggle, mobileOpen = false, onMobileTo
 
   const isActiveRoute = (path) => {
     if (path === '/inventory-management') {
-      // Consider active if on inventory or product-details page
-      return location?.pathname === path || location?.pathname === '/product-details';
+      // Consider active if on inventory or product-details page (both nested under /inventory-management)
+      return location?.pathname.startsWith('/inventory-management');
     }
     if (path === '/management') {
       return location?.pathname.startsWith('/management');
