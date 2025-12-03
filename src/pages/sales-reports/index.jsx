@@ -232,6 +232,7 @@ const SalesReports = () => {
         const productCache = new Map(); // product_id -> product data
         const paymentMethodCache = new Map(); // code -> name
         const staffNameCache = new Map(); // cashier_id -> name
+        const customerCache = new Map(); // customer_id -> name
 
         // Step 1: Fetch all sale details in parallel
         const saleDetailsMap = new Map();
@@ -241,6 +242,19 @@ const SalesReports = () => {
         filteredSales.forEach((sale, idx) => {
           saleDetailsMap.set(sale.sale_id, detailsResults[idx]);
           saleAmountCache.set(sale.sale_id, detailsResults[idx].totalAmount);
+        });
+
+        // Step 1b: Collect unique customer IDs and batch fetch them
+        const uniqueCustomerIds = new Set(filteredSales.filter(s => s.customer_id).map(s => s.customer_id));
+        const customerResults = await Promise.all(
+          Array.from(uniqueCustomerIds).map(cid =>
+            fetchJson(API_ENDPOINTS.CUSTOMER(cid))
+              .then(data => ({ id: cid, name: `${data.first_name} ${data.middle_name ? data.middle_name + ' ' : ''}${data.last_name}` }))
+              .catch(() => ({ id: cid, name: `Customer #${cid}` }))
+          )
+        );
+        customerResults.forEach(({ id, name }) => {
+          customerCache.set(id, name);
         });
 
         // Step 2: Collect unique product IDs and batch fetch them
@@ -390,10 +404,7 @@ const SalesReports = () => {
 
         // Transactions data - reuse cached data
         const mapped = filteredSales.map((item, idx) => {
-          let customerName = 'N/A';
-          if (item.customer_id) {
-            customerName = `Customer #${item.customer_id}`;
-          }
+          const customerName = item.customer_id ? (customerCache.get(item.customer_id) || `Customer #${item.customer_id}`) : 'N/A';
           const { totalAmount: amt, details: det } = saleDetailsMap.get(item.sale_id) || { totalAmount: 0, details: [] };
           const itemsCount = det.reduce((sum, d) => sum + (d.quantity_sold || 0), 0);
           const paymentCode = paymentDataForSales[idx];
@@ -405,7 +416,7 @@ const SalesReports = () => {
             items: itemsCount,
             amount: amt,
             status: item.status || 'completed',
-            timestamp: new Date(item.sale_date),
+            date: new Date(item.sale_date),
             paymentMethod,
             cashier: staffName
           };
