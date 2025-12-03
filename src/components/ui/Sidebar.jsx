@@ -17,6 +17,14 @@ const Sidebar = ({ isCollapsed = false, onToggle, mobileOpen = false, onMobileTo
     setIsMobileOpen(mobileOpen);
   }, [mobileOpen]);
 
+  // Auto-expand inventory submenu when on product-details
+  useEffect(() => {
+    // Auto-expand inventory when on product-details
+    if (location?.pathname === '/product-details') {
+      setExpandedItems(prev => ({ ...prev, '/inventory-management': true }));
+    }
+  }, [location?.pathname]);
+
   // Debug logging
   useEffect(() => {
     console.log('Current user:', user);
@@ -99,6 +107,7 @@ const Sidebar = ({ isCollapsed = false, onToggle, mobileOpen = false, onMobileTo
 
   const isActiveRoute = (path) => {
     if (path === '/inventory-management') {
+      // Consider active if on inventory or product-details page
       return location?.pathname === path || location?.pathname === '/product-details';
     }
     if (path === '/management') {
