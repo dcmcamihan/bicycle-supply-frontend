@@ -116,6 +116,34 @@ const SalesReports = () => {
       return `Employee #${cashierId}`;
     }
   };
+
+  // Helper: get the correct period label for KPI comparison based on dateRange
+  const getKpiPeriodLabel = (range) => {
+    if (typeof range === 'object' && range !== null) {
+      return 'vs. previous period';
+    }
+    switch (range) {
+      case 'today':
+        return 'vs. yesterday';
+      case 'yesterday':
+        return 'vs. day before';
+      case 'last7days':
+        return 'vs. prev. 7 days';
+      case 'last30days':
+        return 'vs. prev. 30 days';
+      case 'thisMonth':
+        return 'vs. last month';
+      case 'lastMonth':
+        return 'vs. month before';
+      case 'thisYear':
+        return 'vs. last year';
+      case 'lastYear':
+        return 'vs. year before';
+      default:
+        return 'vs. prev. 7 days';
+    }
+  };
+
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   // Default dateRange set to 'last7days' (show last 7 days by default)
@@ -142,37 +170,41 @@ const SalesReports = () => {
       title: 'Total Sales',
       value: 0,
       type: 'currency',
-      change: 12.5,
-      period: 'last week',
+      change: 0,
+      period: 'loading...',
       icon: 'DollarSign',
-      bgColor: 'bg-primary'
+      bgColor: 'bg-primary',
+      loading: true
     },
     {
       title: 'Transactions',
-      value: 342,
+      value: 0,
       type: 'number',
-      change: 8.2,
-      period: 'last week',
+      change: 0,
+      period: 'loading...',
       icon: 'ShoppingCart',
-      bgColor: 'bg-secondary'
+      bgColor: 'bg-secondary',
+      loading: true
     },
     {
       title: 'Average Order',
-      value: 375.73,
+      value: 0,
       type: 'currency',
-      change: 4.1,
-      period: 'last week',
+      change: 0,
+      period: 'loading...',
       icon: 'TrendingUp',
-      bgColor: 'bg-accent'
+      bgColor: 'bg-accent',
+      loading: true
     },
     {
       title: 'Top Products',
-      value: 45,
+      value: 0,
       type: 'number',
-      change: -2.3,
-      period: 'last week',
+      change: 0,
+      period: 'loading...',
       icon: 'Star',
-      bgColor: 'bg-success'
+      bgColor: 'bg-success',
+      loading: true
     }
   ]);
 
@@ -189,74 +221,129 @@ const SalesReports = () => {
           return saleDate >= start && saleDate < end;
         });
 
-        // KPI calculations
+        // KPI calculations with optimized parallel fetching
         let totalSales = 0;
         const productCountMap = new Map();
-        // Caches for further reports
         const saleAmountCache = new Map(); // sale_id -> totalAmount
         const productAgg = new Map(); // product_id -> { name, quantity, sales }
         const paymentAgg = new Map(); // method -> { count, amount }
         const staffAgg = new Map(); // cashier -> { name, count, amount }
         const hourAgg = new Map(); // hour(0-23) -> { count, amount }
+        const productCache = new Map(); // product_id -> product data
+        const paymentMethodCache = new Map(); // code -> name
+        const staffNameCache = new Map(); // cashier_id -> name
 
-        for (const sale of filteredSales) {
-          try {
-            const { details, totalAmount, itemsCount } = await getSaleDetailsAndAmount(sale.sale_id);
-            saleAmountCache.set(sale.sale_id, totalAmount);
-            for (const detail of details) {
-              const prod = await fetchJson(API_ENDPOINTS.PRODUCT(detail.product_id));
+        // Step 1: Fetch all sale details in parallel
+        const saleDetailsMap = new Map();
+        const detailsResults = await Promise.all(
+          filteredSales.map(sale => getSaleDetailsAndAmount(sale.sale_id).catch(() => ({ details: [], totalAmount: 0 })))
+        );
+        filteredSales.forEach((sale, idx) => {
+          saleDetailsMap.set(sale.sale_id, detailsResults[idx]);
+          saleAmountCache.set(sale.sale_id, detailsResults[idx].totalAmount);
+        });
+
+        // Step 2: Collect unique product IDs and batch fetch them
+        const uniqueProductIds = new Set();
+        saleDetailsMap.forEach(({ details }) => {
+          details.forEach(detail => {
+            if (detail.product_id) uniqueProductIds.add(detail.product_id);
+          });
+        });
+
+        const productsData = await Promise.all(
+          Array.from(uniqueProductIds).map(pid => 
+            fetchJson(API_ENDPOINTS.PRODUCT(pid)).catch(() => ({ product_id: pid, product_name: String(pid), price: 0 }))
+          )
+        );
+        productsData.forEach(prod => {
+          productCache.set(prod.product_id || prod.id, prod);
+        });
+
+        // Step 3: Collect unique cashier IDs and batch fetch staff names
+        const uniqueCashierIds = new Set(filteredSales.map(s => s.cashier).filter(Boolean));
+        const staffResults = await Promise.all(
+          Array.from(uniqueCashierIds).map(cid =>
+            getStaffName(cid).catch(() => `Employee #${cid}`)
+          )
+        );
+        Array.from(uniqueCashierIds).forEach((cid, idx) => {
+          staffNameCache.set(cid, staffResults[idx]);
+        });
+
+        // Step 4: Collect unique payment method codes and batch fetch names
+        const uniquePaymentCodes = new Set();
+        const paymentDataForSales = await Promise.all(
+          filteredSales.map(sale => 
+            fetchJson(API_ENDPOINTS.SALE_PAYMENT_TYPES_BY_SALE(sale.sale_id))
+              .then(data => {
+                let code = '';
+                if (Array.isArray(data) && data.length > 0) code = data[0].payment_method_code || '';
+                else if (data.payment_method_code) code = data.payment_method_code;
+                if (code) uniquePaymentCodes.add(code);
+                return code;
+              })
+              .catch(() => '')
+          )
+        );
+
+        const paymentMethodResults = await Promise.all(
+          Array.from(uniquePaymentCodes).map(code =>
+            fetchJson(API_ENDPOINTS.PAYMENT_METHOD(code))
+              .then(data => ({ code, name: data.name || code }))
+              .catch(() => ({ code, name: code }))
+          )
+        );
+        paymentMethodResults.forEach(({ code, name }) => {
+          paymentMethodCache.set(code, name);
+        });
+
+        // Step 5: Aggregate data using cached values
+        filteredSales.forEach((sale, saleIdx) => {
+          const { details, totalAmount } = saleDetailsMap.get(sale.sale_id) || { details: [], totalAmount: 0 };
+          totalSales += totalAmount;
+
+          // Product aggregation
+          details.forEach(detail => {
+            if (detail.product_id) {
+              const prod = productCache.get(detail.product_id) || { product_name: String(detail.product_id), price: 0 };
               const price = parseFloat(prod.price) || 0;
               const line = price * (detail.quantity_sold || 0);
-              totalSales += line;
-              if (detail.product_id) {
-                productCountMap.set(
-                  detail.product_id,
-                  (productCountMap.get(detail.product_id) || 0) + (detail.quantity_sold || 0)
-                );
-                const existing = productAgg.get(detail.product_id) || { name: prod.product_name, quantity: 0, sales: 0 };
-                existing.quantity += (detail.quantity_sold || 0);
-                existing.sales += line;
-                productAgg.set(detail.product_id, existing);
-              }
+              productCountMap.set(
+                detail.product_id,
+                (productCountMap.get(detail.product_id) || 0) + (detail.quantity_sold || 0)
+              );
+              const existing = productAgg.get(detail.product_id) || { name: prod.product_name, quantity: 0, sales: 0 };
+              existing.quantity += (detail.quantity_sold || 0);
+              existing.sales += line;
+              productAgg.set(detail.product_id, existing);
             }
-            // Payment aggregation
-            try {
-              const payData = await fetchJson(API_ENDPOINTS.SALE_PAYMENT_TYPES_BY_SALE(sale.sale_id));
-              let code = '';
-              if (Array.isArray(payData) && payData.length > 0) code = payData[0].payment_method_code || '';
-              else if (payData.payment_method_code) code = payData.payment_method_code;
-              let methodLabel = code;
-              if (code) {
-                try {
-                  const method = await fetchJson(API_ENDPOINTS.PAYMENT_METHOD(code));
-                  methodLabel = method.name || code;
-                } catch {}
-              }
-              const existingPay = paymentAgg.get(methodLabel) || { method: methodLabel, count: 0, amount: 0 };
-              existingPay.count += 1;
-              existingPay.amount += (saleAmountCache.get(sale.sale_id) || 0);
-              paymentAgg.set(methodLabel, existingPay);
-            } catch {}
+          });
 
-            // Staff aggregation
-            let staffName = '';
-            try {
-              staffName = await getStaffName(sale.cashier);
-            } catch { staffName = `Employee #${sale.cashier}`; }
-            const existingStaff = staffAgg.get(sale.cashier) || { cashierId: sale.cashier, staff: staffName, count: 0, amount: 0 };
-            existingStaff.count += 1;
-            existingStaff.amount += (saleAmountCache.get(sale.sale_id) || 0);
-            staffAgg.set(sale.cashier, existingStaff);
+          // Payment aggregation
+          const paymentCode = paymentDataForSales[saleIdx];
+          const methodLabel = paymentMethodCache.get(paymentCode) || paymentCode || 'Unknown';
+          const existingPay = paymentAgg.get(methodLabel) || { method: methodLabel, count: 0, amount: 0 };
+          existingPay.count += 1;
+          existingPay.amount += totalAmount;
+          paymentAgg.set(methodLabel, existingPay);
 
-            // Peak hours aggregation
-            const hour = new Date(sale.sale_date).getHours();
-            const existingHour = hourAgg.get(hour) || { hour, count: 0, amount: 0 };
-            existingHour.count += 1;
-            existingHour.amount += (saleAmountCache.get(sale.sale_id) || 0);
-            hourAgg.set(hour, existingHour);
-          } catch {}
-        }
-        // Compute previous period bounds for KPI change
+          // Staff aggregation
+          const staffName = staffNameCache.get(sale.cashier) || `Employee #${sale.cashier}`;
+          const existingStaff = staffAgg.get(sale.cashier) || { cashierId: sale.cashier, staff: staffName, count: 0, amount: 0 };
+          existingStaff.count += 1;
+          existingStaff.amount += totalAmount;
+          staffAgg.set(sale.cashier, existingStaff);
+
+          // Peak hours aggregation
+          const hour = new Date(sale.sale_date).getHours();
+          const existingHour = hourAgg.get(hour) || { hour, count: 0, amount: 0 };
+          existingHour.count += 1;
+          existingHour.amount += totalAmount;
+          hourAgg.set(hour, existingHour);
+        });
+
+        // Compute previous period bounds for KPI change (simplified - only count for comparison)
         const msPerDay = 24*60*60*1000;
         const curLenDays = Math.max(1, Math.round((end - start) / msPerDay));
         const prevEnd = new Date(start);
@@ -266,20 +353,25 @@ const SalesReports = () => {
           const d = new Date(sale.sale_date);
           return d >= prevStart && d < prevEnd;
         });
+
+        // Fetch previous period details in parallel
         let prevTotalSales = 0;
         const prevProductCountMap = new Map();
-        for (const sale of prevSales) {
-          try {
-            const { details, totalAmount } = await getSaleDetailsAndAmount(sale.sale_id);
-            prevTotalSales += totalAmount;
-            for (const detail of details) {
-              if (detail.product_id) prevProductCountMap.set(
+        const prevDetailsResults = await Promise.all(
+          prevSales.map(sale => getSaleDetailsAndAmount(sale.sale_id).catch(() => ({ details: [], totalAmount: 0 })))
+        );
+        prevDetailsResults.forEach(({ details, totalAmount }) => {
+          prevTotalSales += totalAmount;
+          details.forEach(detail => {
+            if (detail.product_id) {
+              prevProductCountMap.set(
                 detail.product_id,
                 (prevProductCountMap.get(detail.product_id) || 0) + (detail.quantity_sold || 0)
               );
             }
-          } catch {}
-        }
+          });
+        });
+
         const prevTxCount = prevSales.length;
         const prevAvgOrder = prevTxCount > 0 ? prevTotalSales / prevTxCount : 0;
         const prevTopProductsCount = prevProductCountMap.size;
@@ -287,98 +379,52 @@ const SalesReports = () => {
         const avgOrder = filteredSales.length > 0 ? totalSales / filteredSales.length : 0;
         const topProductsCount = productCountMap.size;
         const pct = (cur, prev) => prev > 0 ? ((cur - prev) / prev) * 100 : (cur > 0 ? 100 : 0);
+        const periodLabel = getKpiPeriodLabel(dateRange);
         setKpiData(prev => prev.map(kpi => {
-          if (kpi.title === 'Total Sales') return { ...kpi, value: totalSales, change: pct(totalSales, prevTotalSales), period: 'vs prev' };
-          if (kpi.title === 'Transactions') return { ...kpi, value: filteredSales.length, change: pct(filteredSales.length, prevTxCount), period: 'vs prev' };
-          if (kpi.title === 'Average Order') return { ...kpi, value: avgOrder, change: pct(avgOrder, prevAvgOrder), period: 'vs prev' };
-          if (kpi.title === 'Top Products') return { ...kpi, value: topProductsCount, change: pct(topProductsCount, prevTopProductsCount), period: 'vs prev' };
+          if (kpi.title === 'Total Sales') return { ...kpi, value: totalSales, change: pct(totalSales, prevTotalSales), period: periodLabel, loading: false };
+          if (kpi.title === 'Transactions') return { ...kpi, value: filteredSales.length, change: pct(filteredSales.length, prevTxCount), period: periodLabel, loading: false };
+          if (kpi.title === 'Average Order') return { ...kpi, value: avgOrder, change: pct(avgOrder, prevAvgOrder), period: periodLabel, loading: false };
+          if (kpi.title === 'Top Products') return { ...kpi, value: topProductsCount, change: pct(topProductsCount, prevTopProductsCount), period: periodLabel, loading: false };
           return kpi;
         }));
 
-        // Transactions data
-        const mapped = await Promise.all(filteredSales.map(async item => {
+        // Transactions data - reuse cached data
+        const mapped = filteredSales.map((item, idx) => {
           let customerName = 'N/A';
           if (item.customer_id) {
-            try {
-              const custData = await fetchJson(API_ENDPOINTS.CUSTOMER(item.customer_id));
-              customerName = `${custData.first_name} ${custData.middle_name ? custData.middle_name + ' ' : ''}${custData.last_name}`;
-            } catch {
-              customerName = `Customer #${item.customer_id}`;
-            }
+            customerName = `Customer #${item.customer_id}`;
           }
-          let itemsCount = 0;
-          let totalAmount = 0;
-          try {
-            const { totalAmount: amt, itemsCount: cnt } = await getSaleDetailsAndAmount(item.sale_id);
-            itemsCount = cnt;
-            totalAmount = amt;
-          } catch {
-            itemsCount = 0;
-            totalAmount = 0;
-          }
-          let paymentMethod = '';
-          try {
-            paymentMethod = await getPaymentMethod(item.sale_id);
-            // Fallback to code if description is missing
-            if (!paymentMethod) {
-              const payData = await fetchJson(API_ENDPOINTS.SALE_PAYMENT_TYPES_BY_SALE(item.sale_id));
-              if (Array.isArray(payData) && payData.length > 0) {
-                paymentMethod = payData[0].payment_method_code || '';
-              } else if (payData.payment_method_code) {
-                paymentMethod = payData.payment_method_code;
-              }
-            }
-          } catch {
-            // Fallback to code if fetch fails
-            try {
-              const payData = await fetchJson(API_ENDPOINTS.SALE_PAYMENT_TYPES_BY_SALE(item.sale_id));
-              if (Array.isArray(payData) && payData.length > 0) {
-                paymentMethod = payData[0].payment_method_code || '';
-              } else if (payData.payment_method_code) {
-                paymentMethod = payData.payment_method_code;
-              }
-            } catch {
-              paymentMethod = '';
-            }
-          }
-          let staffName = '';
-          try {
-            staffName = await getStaffName(item.cashier);
-          } catch {
-            staffName = `Employee #${item.cashier}`;
-          }
+          const { totalAmount: amt, details: det } = saleDetailsMap.get(item.sale_id) || { totalAmount: 0, details: [] };
+          const itemsCount = det.reduce((sum, d) => sum + (d.quantity_sold || 0), 0);
+          const paymentCode = paymentDataForSales[idx];
+          const paymentMethod = paymentMethodCache.get(paymentCode) || paymentCode || '';
+          const staffName = staffNameCache.get(item.cashier) || `Employee #${item.cashier}`;
           return {
             id: item.sale_id,
-            date: item.sale_date ? new Date(item.sale_date).toISOString().split('T')[0] : '',
             customer: customerName,
-            amount: totalAmount,
             items: itemsCount,
+            amount: amt,
+            status: item.status || 'completed',
+            timestamp: new Date(item.sale_date),
             paymentMethod,
-            status: item.status ?? 'completed',
-            staff: staffName,
-            manager: item.manager
+            cashier: staffName
           };
-        }));
+        });
         setTransactionsData(mapped);
-        setTransactionsError(null);
-
-        // Set new datasets
-        const best = Array.from(productAgg.values()).sort((a,b) => b.quantity - a.quantity).slice(0, 10);
-        setBestSellers(best);
-        const pay = Array.from(paymentAgg.values()).sort((a,b) => b.amount - a.amount);
-        setPaymentDistribution(pay);
-        const staff = Array.from(staffAgg.values()).sort((a,b) => b.amount - a.amount);
-        setStaffPerformance(staff);
-        const hours = Array.from(hourAgg.values()).sort((a,b) => a.hour - b.hour);
-        setPeakHours(hours);
-      } catch (error) {
-        setTransactionsError(error.message);
-        setTransactionsData([]);
-        setBestSellers([]);
-        setPaymentDistribution([]);
-        setStaffPerformance([]);
-        setPeakHours([]);
-      } finally {
+        setSalesChartData([
+          { date: new Date(start).toLocaleDateString(), sales: totalSales }
+        ]);
+        setBestSellers(
+          Array.from(productAgg.values())
+            .sort((a, b) => b.sales - a.sales)
+            .slice(0, 10)
+            .map(p => ({ name: p.name, quantity: p.quantity, sales: p.sales }))
+        );
+        setPaymentDistribution(Array.from(paymentAgg.values()).map(p => ({ method: p.method, count: p.count, amount: p.amount })));
+        setStaffPerformance(Array.from(staffAgg.values()).map(s => ({ staff: s.staff, cashierId: s.cashierId, count: s.count, amount: s.amount })));
+        setPeakHours(Array.from(hourAgg.values()).sort((a, b) => a.hour - b.hour));
+        setLoadingTransactions(false);
+      } catch (err) {
         setLoadingTransactions(false);
       }
     };

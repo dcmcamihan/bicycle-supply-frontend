@@ -34,23 +34,33 @@ const KPICards = ({ kpiData }) => {
             <div className={`w-10 sm:w-12 h-10 sm:h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${kpi?.bgColor}`}>
               <Icon name={kpi?.icon} size={20} color="white" />
             </div>
-            <div className={`flex items-center space-x-1 ${getChangeColor(kpi?.change)}`}>
-              <Icon name={getChangeIcon(kpi?.change)} size={16} />
-              <span className="font-body text-xs sm:text-sm font-medium">
-                {formatPercentage(kpi?.change)}
-              </span>
-            </div>
+            {kpi?.loading ? (
+              <div className="flex items-center space-x-1 text-muted-foreground animate-pulse">
+                <Icon name="Loader" size={16} className="animate-spin" />
+              </div>
+            ) : (
+              <div className={`flex items-center space-x-1 ${getChangeColor(kpi?.change)}`}>
+                <Icon name={getChangeIcon(kpi?.change)} size={16} />
+                <span className="font-body text-xs sm:text-sm font-medium">
+                  {formatPercentage(kpi?.change)}
+                </span>
+              </div>
+            )}
           </div>
           
           <div className="space-y-1 min-w-0">
             <h3 className="font-body text-xs sm:text-sm font-medium text-muted-foreground truncate">
               {kpi?.title}
             </h3>
-            <p className="font-heading text-lg sm:text-2xl font-bold text-foreground break-words">
-              {kpi?.type === 'currency' ? formatCurrency(kpi?.value) : kpi?.value?.toLocaleString()}
-            </p>
+            {kpi?.loading ? (
+              <div className="h-8 bg-muted rounded animate-pulse mb-2"></div>
+            ) : (
+              <p className="font-heading text-lg sm:text-2xl font-bold text-foreground break-words">
+                {kpi?.type === 'currency' ? formatCurrency(kpi?.value) : kpi?.value?.toLocaleString()}
+              </p>
+            )}
             <p className="font-caption text-xs text-muted-foreground">
-              vs. {kpi?.period}
+              {kpi?.period}
             </p>
           </div>
         </div>
