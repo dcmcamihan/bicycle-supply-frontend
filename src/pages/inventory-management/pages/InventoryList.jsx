@@ -433,15 +433,18 @@ const InventoryList = () => {
 
         // Stock status filter
         if (filters?.stockStatus) {
-          if (filters?.stockStatus === 'out-of-stock' && product?.stock >= 1) return false;
-          if (filters?.stockStatus === 'low-stock' && (product?.stock <= 0 || product?.stock > product?.reorderLevel)) return false;
-          if (filters?.stockStatus === 'in-stock' && product?.stock <= product?.reorderLevel) return false;
+          const reorderLevel = product?.reorderLevel || 3;
+          if (filters?.stockStatus === 'out-of-stock' && product?.stock > 0) return false;
+          if (filters?.stockStatus === 'low-stock' && (product?.stock <= 0 || product?.stock > reorderLevel)) return false;
+          if (filters?.stockStatus === 'in-stock' && product?.stock <= reorderLevel) return false;
         }
 
         // Price range filter
         if (filters?.priceRange) {
-          const [min, max] = filters?.priceRange?.split('-')?.map(p => p === '+' ? Infinity : parseFloat(p));
-          if (product?.price < min || (max !== Infinity && product?.price > max)) {
+          const [minStr, maxStr] = filters?.priceRange?.split('-');
+          const min = parseFloat(minStr);
+          const max = maxStr === '+' ? Infinity : parseFloat(maxStr);
+          if (product?.price < min || product?.price > max) {
             return false;
           }
         }
