@@ -210,8 +210,10 @@ const InventoryList = () => {
         } catch {}
       }
       setProductSupplierMap(map);
+      return map;
     } catch {
       setProductSupplierMap(new Map());
+      return new Map();
     }
   };
 
@@ -581,9 +583,42 @@ const InventoryList = () => {
     setShowProductModal(true);
   };
 
-  const handleEditProduct = (product) => {
-    setEditingProduct(product);
-    setShowProductModal(true);
+  const handleEditProduct = async (product) => {
+    try {
+      // Determine product id
+      const pid = product?.id || product?.product_id;
+      let supplierId = product?.supplierId || null;
+
+      // Prefer single backend call to get the latest supplier for this product
+      if (pid) {
+        try {
+          const res = await fetch(`${API_ENDPOINTS.PRODUCT(pid)}/latest-supplier`);
+          if (res.ok) {
+            const latest = await res.json();
+            if (latest) {
+              // latest may include supplier_id or supplier object
+              supplierId = latest.supplier_id || (latest.supplier && latest.supplier.supplier_id) || supplierId;
+            }
+          } else {
+            // non-OK response: fall back to existing productSupplierMap
+            const entry = productSupplierMap.get(Number(pid));
+            supplierId = supplierId || entry?.supplier_id || null;
+          }
+        } catch (e) {
+          // network/db error: fallback to productSupplierMap
+          const entry = productSupplierMap.get(Number(pid));
+          supplierId = supplierId || entry?.supplier_id || null;
+          console.warn('Failed to fetch latest supplier for product', pid, e);
+        }
+      }
+
+      setEditingProduct({ ...product, supplierId });
+      setShowProductModal(true);
+    } catch (err) {
+      console.error('Error preparing product for edit:', err);
+      setEditingProduct(product);
+      setShowProductModal(true);
+    }
   };
 
   
