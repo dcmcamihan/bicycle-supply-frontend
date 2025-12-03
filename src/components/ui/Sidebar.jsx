@@ -182,10 +182,56 @@ const Sidebar = ({ isCollapsed = false, onToggle, mobileOpen = false, onMobileTo
           
           return (
             <div key={item?.path}>
-              <div className="flex items-center gap-0">
+              {hasSubItems ? (
+                // For items with subItems, use a button that handles expansion
+                <button
+                  onClick={() => setExpandedItems(prev => ({ ...prev, [item?.path]: !isExpanded }))}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg font-body text-sm transition-smooth group ${
+                    isActive
+                      ? 'bg-primary text-primary-foreground shadow-subtle'
+                      : 'text-foreground hover:bg-muted hover:text-foreground'
+                  }`}
+                  title={isCollapsed ? item?.label : ''}
+                >
+                  <Icon 
+                    name={item?.icon} 
+                    size={20} 
+                    className={`flex-shrink-0 ${
+                      isActive 
+                        ? 'text-primary-foreground' 
+                        : 'text-muted-foreground group-hover:text-foreground'
+                    }`}
+                  />
+                  {!isCollapsed && (
+                    <>
+                      <div className="flex-1 min-w-0 text-left">
+                        <div className="font-medium">{item?.label}</div>
+                        {item?.description && (
+                          <div className="text-xs opacity-75 truncate">{item?.description}</div>
+                        )}
+                      </div>
+                      {/* Pending badge for Orders */}
+                      {item?.path === '/orders/pending' && (
+                        <span className="inline-flex items-center justify-center min-w-[22px] h-5 px-2 text-xs rounded-full bg-accent text-accent-foreground border border-border flex-shrink-0">
+                          {pendingCount}
+                        </span>
+                      )}
+                      {/* Chevron indicator - makes it clear it's expandable */}
+                      <Icon 
+                        name={isExpanded ? "ChevronDown" : "ChevronRight"} 
+                        size={16}
+                        className={`flex-shrink-0 transition-transform ${
+                          isActive ? 'text-primary-foreground' : 'text-muted-foreground'
+                        }`}
+                      />
+                    </>
+                  )}
+                </button>
+              ) : (
+                // For items without subItems, use a link
                 <Link
                   to={item?.path}
-                  className={`flex-1 flex items-center space-x-3 px-3 py-2 rounded-lg font-body text-sm transition-smooth group ${
+                  className={`flex items-center space-x-3 px-3 py-2 rounded-lg font-body text-sm transition-smooth group ${
                     isActive
                       ? 'bg-primary text-primary-foreground shadow-subtle'
                       : 'text-foreground hover:bg-muted hover:text-foreground'
@@ -218,27 +264,7 @@ const Sidebar = ({ isCollapsed = false, onToggle, mobileOpen = false, onMobileTo
                     </div>
                   )}
                 </Link>
-                
-                {/* Expand/Collapse button - only shown when not collapsed */}
-                {!isCollapsed && hasSubItems && (
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setExpandedItems(prev => ({ ...prev, [item?.path]: !isExpanded }));
-                    }}
-                    className="p-1 rounded hover:bg-muted transition-smooth flex-shrink-0"
-                    title={isExpanded ? 'Collapse' : 'Expand'}
-                  >
-                    <Icon 
-                      name={isExpanded ? "ChevronDown" : "ChevronRight"} 
-                      size={16}
-                      className={`transition-transform ${
-                        isActive ? 'text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
-                      }`}
-                    />
-                  </button>
-                )}
-              </div>
+              )}
 
               {/* Sub-items - visible when expanded and not collapsed */}
               {!isCollapsed && hasSubItems && isExpanded && (
