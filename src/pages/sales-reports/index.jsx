@@ -418,7 +418,7 @@ const SalesReports = () => {
             status: item.status || 'completed',
             date: new Date(item.sale_date),
             paymentMethod,
-            cashier: staffName
+            staff: staffName
           };
         });
         setTransactionsData(mapped);
