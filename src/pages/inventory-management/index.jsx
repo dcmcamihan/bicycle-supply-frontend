@@ -1,16 +1,15 @@
 import React from 'react';
-import { Routes as RouterRoutes, Route } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import InventoryList from './pages/InventoryList';
 import ProductDetails from '../product-details';
 
 const InventoryManagement = () => {
-  return (
-    <RouterRoutes>
-      <Route index element={<InventoryList />} />
-      <Route path="list" element={<InventoryList />} />
-      <Route path="product-details" element={<ProductDetails />} />
-    </RouterRoutes>
-  );
+  const location = useLocation();
+  
+  // Check if we're on product-details subpage
+  const isProductDetailsPage = location.pathname.includes('/product-details');
+
+  return isProductDetailsPage ? <ProductDetails /> : <InventoryList />;
 };
 
 export default InventoryManagement;

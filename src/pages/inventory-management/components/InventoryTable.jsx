@@ -138,7 +138,7 @@ const InventoryTable = ({
                     <div className="min-w-0 flex-1">
                       <button
                         className="font-body font-medium text-xs sm:text-sm text-primary underline underline-offset-2 hover:text-primary/80 truncate text-left bg-transparent border-0 p-0 cursor-pointer"
-                        onClick={() => navigate(`/product-details?id=${product?.id}`)}
+                        onClick={() => navigate(`/inventory-management/product-details?id=${product?.id}`)}
                         title={product?.name}
                         type="button"
                       >
