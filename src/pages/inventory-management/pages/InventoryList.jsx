@@ -627,54 +627,64 @@ const InventoryList = () => {
       try { savedProduct = await res.json(); } catch {}
       const newProductId = isEdit ? productId : (savedProduct?.product_id || savedProduct?.id);
 
+      // Validate that we have a product ID before syncing images
+      if (!newProductId) {
+        throw new Error('Could not determine product ID after save. Images cannot be synced.');
+      }
+
       // Sync product images via product-images endpoints if provided
-      if (newProductId) {
-        const urls = Array.isArray(productData.image_urls)
-          ? productData.image_urls.filter(u => !!u)
-          : (productData.image_url ? [productData.image_url] : []);
+      const urls = Array.isArray(productData.image_urls)
+        ? productData.image_urls.filter(u => !!u)
+        : (productData.image_url ? [productData.image_url] : []);
 
-        if (Array.isArray(urls) && urls.length > 0) {
-          try {
-            // Fetch existing images for this product
-            const existingRes = await fetch(API_ENDPOINTS.PRODUCT_IMAGES_BY_PRODUCT(newProductId));
-            if (!existingRes.ok) {
-              throw new Error(`Failed to fetch existing images: ${existingRes.status} ${existingRes.statusText}`);
-            }
-            const existing = await existingRes.json();
-
-            const existingByUrl = (existing || []).reduce((acc, img) => {
-              if (img && img.image_url) acc[img.image_url] = img;
-              return acc;
-            }, {});
-
-            // Create any new images not present
-            for (const url of urls) {
-              if (!existingByUrl[url]) {
-                const createRes = await fetch(API_ENDPOINTS.PRODUCT_IMAGES, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ product_id: newProductId, image_url: url })
-                });
-                if (!createRes.ok) {
-                  throw new Error(`Failed to save image "${url}": ${createRes.status} ${createRes.statusText}`);
-                }
-              }
-            }
-
-            // Delete images that exist but are not in the provided urls (only when editing)
-            if (isEdit) {
-              for (const img of existing || []) {
-                if (!urls.includes(img.image_url)) {
-                  const deleteRes = await fetch(API_ENDPOINTS.PRODUCT_IMAGE(img.product_image_id), { method: 'DELETE' });
-                  if (!deleteRes.ok) {
-                    throw new Error(`Failed to delete image: ${deleteRes.status} ${deleteRes.statusText}`);
-                  }
-                }
-              }
-            }
-          } catch (e) {
-            throw new Error(`Image sync error: ${e.message}`);
+      if (Array.isArray(urls) && urls.length > 0) {
+        try {
+          // Fetch existing images for this product
+          const existingRes = await fetch(API_ENDPOINTS.PRODUCT_IMAGES_BY_PRODUCT(newProductId));
+          if (!existingRes.ok) {
+            const existingErr = await existingRes.text();
+            throw new Error(`Failed to fetch existing images: ${existingRes.status} ${existingRes.statusText} - ${existingErr}`);
           }
+          const existing = await existingRes.json();
+
+          const existingByUrl = (existing || []).reduce((acc, img) => {
+            if (img && img.image_url) acc[img.image_url] = img;
+            return acc;
+          }, {});
+
+          // Create any new images not present
+          for (const url of urls) {
+            if (!existingByUrl[url]) {
+              const imagePayload = { 
+                product_id: parseInt(newProductId), 
+                image_url: url 
+              };
+              const createRes = await fetch(API_ENDPOINTS.PRODUCT_IMAGES, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(imagePayload)
+              });
+              if (!createRes.ok) {
+                const createErr = await createRes.text();
+                throw new Error(`Failed to save image "${url}": ${createRes.status} ${createRes.statusText} - ${createErr}`);
+              }
+            }
+          }
+
+          // Delete images that exist but are not in the provided urls (only when editing)
+          if (isEdit) {
+            for (const img of existing || []) {
+              if (!urls.includes(img.image_url)) {
+                const deleteRes = await fetch(API_ENDPOINTS.PRODUCT_IMAGE(img.product_image_id), { method: 'DELETE' });
+                if (!deleteRes.ok) {
+                  const deleteErr = await deleteRes.text();
+                  throw new Error(`Failed to delete image: ${deleteRes.status} ${deleteRes.statusText} - ${deleteErr}`);
+                }
+              }
+            }
+          }
+        } catch (e) {
+          throw new Error(`Image sync error: ${e.message}`);
         }
       }
       // When creating a new product: if initial stock provided and supplier selected,
