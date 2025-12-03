@@ -38,6 +38,26 @@ const ProductModal = ({ isOpen, onClose, product = null, onSave, suppliers = [],
         trackInventory: product.trackInventory !== false
       });
       setCurrentPreviewIndex(0);
+      
+      // Fetch images from server if editing an existing product
+      if (product?.id || product?.product_id) {
+        const pid = product.id || product.product_id;
+        fetch(`${API_ENDPOINTS.PRODUCT_IMAGES_BY_PRODUCT(pid)}`)
+          .then(res => res.ok ? res.json() : [])
+          .then(images => {
+            if (Array.isArray(images) && images.length > 0) {
+              const imageUrls = images.map(img => img.image_url).filter(Boolean);
+              if (imageUrls.length > 0) {
+                setFormData(prev => ({
+                  ...prev,
+                  image_urls: imageUrls,
+                  image_url: imageUrls[0] || ''
+                }));
+              }
+            }
+          })
+          .catch(err => console.error('Failed to fetch product images:', err));
+      }
     } else {
       setFormData({ name: '', category: '', brand: '', description: '', price: '', stock: '', reorderLevel: '', supplier: '', image_url: '', image_urls: [], isActive: true, trackInventory: true });
       setCurrentPreviewIndex(0);

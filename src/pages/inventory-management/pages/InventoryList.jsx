@@ -141,6 +141,7 @@ const InventoryList = () => {
             warranty: item.warranty_period || '',
             image: '',
             image_url: item.image_url || '',
+            supplierId: item.supplier_id || null,
             lastUpdated: '',
             isActive: true,
             trackInventory: true
@@ -184,42 +185,43 @@ const InventoryList = () => {
   }, []);
 
   // Build latest supplier per product using supplies + supply_details
-  useEffect(() => {
-    const buildProductSupplierMap = async () => {
-      try {
-        const map = new Map();
-        const supRes = await fetch(API_ENDPOINTS.SUPPLIES);
-        if (!supRes.ok) { setProductSupplierMap(map); return; }
-        const supplies = await supRes.json();
-        for (const sup of supplies) {
-          const supplyId = sup?.supply_id;
-          const supplierId = sup?.supplier_id;
-          const date = new Date(sup?.supply_date || 0).getTime();
-          try {
-            const detRes = await fetch(API_ENDPOINTS.SUPPLY_DETAILS_BY_SUPPLY(supplyId));
-            if (!detRes.ok) continue;
-            const dets = await detRes.json();
-            for (const d of dets) {
-              const pid = Number(d?.product_id);
-              if (!pid) continue;
-              const prev = map.get(pid);
-              if (!prev || date > prev.date) {
-                map.set(pid, { supplier_id: Number(supplierId), date });
-              }
+  const buildProductSupplierMap = async () => {
+    try {
+      const map = new Map();
+      const supRes = await fetch(API_ENDPOINTS.SUPPLIES);
+      if (!supRes.ok) { setProductSupplierMap(map); return; }
+      const supplies = await supRes.json();
+      for (const sup of supplies) {
+        const supplyId = sup?.supply_id;
+        const supplierId = sup?.supplier_id;
+        const date = new Date(sup?.supply_date || 0).getTime();
+        try {
+          const detRes = await fetch(API_ENDPOINTS.SUPPLY_DETAILS_BY_SUPPLY(supplyId));
+          if (!detRes.ok) continue;
+          const dets = await detRes.json();
+          for (const d of dets) {
+            const pid = Number(d?.product_id);
+            if (!pid) continue;
+            const prev = map.get(pid);
+            if (!prev || date > prev.date) {
+              map.set(pid, { supplier_id: Number(supplierId), date });
             }
-          } catch {}
-        }
-        setProductSupplierMap(map);
-      } catch {
-        setProductSupplierMap(new Map());
+          }
+        } catch {}
       }
-    };
+      setProductSupplierMap(map);
+    } catch {
+      setProductSupplierMap(new Map());
+    }
+  };
+
+  useEffect(() => {
     buildProductSupplierMap();
   }, []);
 
   // Update mockProducts with supplier IDs after productSupplierMap is built
   useEffect(() => {
-    if (mockProducts.length > 0 && productSupplierMap.size > 0) {
+    if (mockProducts.length > 0) {
       const updatedProducts = mockProducts.map(product => {
         const supplierEntry = productSupplierMap.get(Number(product.id));
         return {
@@ -623,6 +625,7 @@ const InventoryList = () => {
         brand_id: productData.brand ? parseInt(productData.brand) : null,
         price: normalizedPrice,
         reorder_level: productData.reorderLevel ? parseInt(productData.reorderLevel) : 3,
+        supplier_id: productData.supplier ? parseInt(productData.supplier) : null,
         // Support multiple image URLs (frontend feature). For backward compatibility send image_url as the first image.
         image_url: (Array.isArray(productData.image_urls) && productData.image_urls.length > 0) ? productData.image_urls[0] : (productData.image_url || null),
         image_urls: Array.isArray(productData.image_urls) ? productData.image_urls : (productData.image_url ? [productData.image_url] : undefined)
@@ -748,6 +751,14 @@ const InventoryList = () => {
       const response = await fetch(API_ENDPOINTS.PRODUCTS);
       const data = await response.json();
       setRawProducts(data);
+      
+      // Refresh supplier map after products are updated
+      // This ensures supplier data is updated when products are saved
+      try {
+        await buildProductSupplierMap();
+      } catch (err) {
+        console.error('Failed to refresh supplier map:', err);
+      }
     } catch (error) {
       console.error('Failed to save product:', error);
       alert('Failed to save product');
