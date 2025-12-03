@@ -89,7 +89,7 @@ const ProductDetails = () => {
             const qp = new URLSearchParams();
             qp.set('id', String(firstId));
             if (openAdjust) qp.set('openAdjust', '1');
-            navigate(`/product-details?${qp.toString()}`, { replace: true });
+            navigate(`/inventory-management/product-details?${qp.toString()}`, { replace: true });
             return; // stop further fetch in this render
           }
         }
@@ -196,7 +196,7 @@ const ProductDetails = () => {
     if (!pid) return;
     const qp = new URLSearchParams();
     qp.set('id', String(pid));
-    navigate(`/product-details?${qp.toString()}`);
+    navigate(`/inventory-management/product-details?${qp.toString()}`);
   };
 
   const goPrev = () => { if (currentIndex > 0) goToProductByIndex(currentIndex - 1); };

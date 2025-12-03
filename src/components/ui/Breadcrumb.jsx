@@ -9,7 +9,7 @@ const Breadcrumb = ({ customItems = null }) => {
     '/dashboard': { label: 'Dashboard', icon: 'LayoutDashboard' },
     '/point-of-sale': { label: 'Point of Sale', icon: 'ShoppingCart' },
     '/inventory-management': { label: 'Inventory Management', icon: 'Package' },
-    '/product-details': { label: 'Product Details', icon: 'Info', parent: '/inventory-management' },
+    '/inventory-management/product-details': { label: 'Product Details', icon: 'Info', parent: '/inventory-management' },
     '/sales-reports': { label: 'Sales Reports', icon: 'BarChart3' },
     '/login': { label: 'Login', icon: 'LogIn' }
   };

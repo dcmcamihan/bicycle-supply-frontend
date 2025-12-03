@@ -20,7 +20,7 @@ const Sidebar = ({ isCollapsed = false, onToggle, mobileOpen = false, onMobileTo
   // Auto-expand inventory submenu when on product-details
   useEffect(() => {
     // Auto-expand inventory when on product-details
-    if (location?.pathname === '/product-details') {
+    if (location?.pathname.includes('/inventory-management')) {
       setExpandedItems(prev => ({ ...prev, '/inventory-management': true }));
     }
   }, [location?.pathname]);
