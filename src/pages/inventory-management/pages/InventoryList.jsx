@@ -696,6 +696,16 @@ const InventoryList = () => {
 
       if (Array.isArray(urls) && urls.length > 0) {
         try {
+          // verify product exists before attempting to sync images
+          try {
+            const productCheck = await fetch(API_ENDPOINTS.PRODUCT(newProductId));
+            if (!productCheck.ok) {
+              const prodText = await productCheck.text().catch(()=>null);
+              throw new Error(`Product check failed: ${productCheck.status} ${productCheck.statusText} - ${prodText}`);
+            }
+          } catch (pcErr) {
+            throw new Error(`Product existence check failed before image sync: ${pcErr?.message || pcErr}`);
+          }
           // Fetch existing images for this product
           const existingRes = await fetch(API_ENDPOINTS.PRODUCT_IMAGES_BY_PRODUCT(newProductId));
           if (!existingRes.ok) {
