@@ -142,7 +142,7 @@ const InventoryList = () => {
             image: '',
             image_url: item.image_url || '',
             supplierId: item.supplier_id || null,
-            lastUpdated: '',
+            lastUpdated: item.updated_at || item.updatedAt || item.last_updated || null,
             isActive: true,
             trackInventory: true
           };
@@ -226,14 +226,19 @@ const InventoryList = () => {
     if (mockProducts.length > 0) {
       const updatedProducts = mockProducts.map(product => {
         const supplierEntry = productSupplierMap.get(Number(product.id));
+        // Prefer supplier from productSupplierMap (latest supply), fallback to existing product.supplierId
+        const sid = supplierEntry?.supplier_id || product.supplierId || null;
+        const supplierObj = mockSuppliers.find(s => String(s.id) === String(sid));
+        const supplierName = supplierObj ? supplierObj.name : (sid ? `Supplier #${sid}` : '');
         return {
           ...product,
-          supplierId: supplierEntry?.supplier_id || null
+          supplierId: sid,
+          supplier: supplierName
         };
       });
       setMockProducts(updatedProducts);
     }
-  }, [productSupplierMap]);
+  }, [productSupplierMap, mockSuppliers]);
 
   // Recent movements (real data)
   const [recentMovements, setRecentMovements] = useState([]);

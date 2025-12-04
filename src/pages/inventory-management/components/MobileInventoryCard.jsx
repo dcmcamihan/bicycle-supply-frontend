@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import Image from '../../../components/AppImage';
 import Button from '../../../components/ui/Button';
@@ -34,12 +35,17 @@ const MobileInventoryCard = ({
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString)?.toLocaleDateString('en-US', {
+    if (!dateString) return '—';
+    const d = new Date(dateString);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric'
     });
   };
+
+  const navigate = useNavigate();
 
   return (
     <div className={`bg-card border border-border rounded-lg shadow-subtle overflow-hidden transition-smooth ${
@@ -166,6 +172,16 @@ const MobileInventoryCard = ({
             
             
             
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate(`/inventory-management/product-details?id=${product?.id}`)}
+              iconName="Eye"
+              iconSize={16}
+            >
+              View
+            </Button>
+
             <Button
               variant="destructive"
               size="sm"
