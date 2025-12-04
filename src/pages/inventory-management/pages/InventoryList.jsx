@@ -746,20 +746,40 @@ const InventoryList = () => {
           // Create any new images not present
           for (const url of urls) {
             if (!existingByUrl[url]) {
-              const imagePayload = { 
-                product_id: parseInt(newProductId), 
-                image_url: url 
+              const imagePayload = {
+                product_id: parseInt(newProductId),
+                image_url: url
               };
-              const createRes = await fetch(API_ENDPOINTS.PRODUCT_IMAGES, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(imagePayload)
-              });
-              const createResText = await createRes.clone().text().catch(()=>null);
-              console.debug('[Inventory] create product image', { productId: newProductId, url, status: createRes.status, body: createResText });
-              if (!createRes.ok) {
+              // Retry image creation on transient failures (e.g. brief product visibility lag)
+              const maxImageAttempts = 3;
+              let imgAttempt = 0;
+              let created = false;
+              while (imgAttempt < maxImageAttempts && !created) {
+                imgAttempt += 1;
+                const createRes = await fetch(API_ENDPOINTS.PRODUCT_IMAGES, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(imagePayload)
+                });
+                const createResText = await createRes.clone().text().catch(() => null);
+                console.debug('[Inventory] create product image attempt', { productId: newProductId, url, attempt: imgAttempt, status: createRes.status, body: createResText });
+                if (createRes.ok) {
+                  created = true;
+                  break;
+                }
+                // If server explicitly says product not found, wait and retry
+                const bodyLower = String(createResText || '').toLowerCase();
+                if (createRes.status === 404 || bodyLower.includes('product not found')) {
+                  // small backoff before retry
+                  await new Promise(r => setTimeout(r, 150 * imgAttempt));
+                  continue;
+                }
+                // non-retryable error - throw
                 const createErr = createResText || `${createRes.status} ${createRes.statusText}`;
                 throw new Error(`Failed to save image "${url}": ${createErr}`);
+              }
+              if (!created) {
+                throw new Error(`Failed to save image "${url}" after ${maxImageAttempts} attempts`);
               }
             }
           }
