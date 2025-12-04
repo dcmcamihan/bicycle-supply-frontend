@@ -675,13 +675,17 @@ const InventoryList = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
+      // Debug: log response status and body for diagnostics
+      let resText = null;
+      try { resText = await res.clone().text(); } catch (e) { resText = null; }
+      console.debug('[Inventory] save product response', { url, method, status: res.status, statusText: res.statusText, body: resText });
       if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(errText || (isEdit ? 'Failed to update product' : 'Failed to create product'));
+        const errText = resText || (isEdit ? 'Failed to update product' : 'Failed to create product');
+        throw new Error(errText);
       }
       // Parse created/updated product to get product_id
       let savedProduct = null;
-      try { savedProduct = await res.json(); } catch {}
+      try { savedProduct = await res.json(); } catch (e) { console.debug('Failed to parse saved product JSON', e); }
       const newProductId = isEdit ? productId : (savedProduct?.product_id || savedProduct?.id);
 
       // Validate that we have a product ID before syncing images
@@ -696,21 +700,36 @@ const InventoryList = () => {
 
       if (Array.isArray(urls) && urls.length > 0) {
         try {
-          // verify product exists before attempting to sync images
-          try {
-            const productCheck = await fetch(API_ENDPOINTS.PRODUCT(newProductId));
-            if (!productCheck.ok) {
-              const prodText = await productCheck.text().catch(()=>null);
-              throw new Error(`Product check failed: ${productCheck.status} ${productCheck.statusText} - ${prodText}`);
+          // verify product exists before attempting to sync images (retry a few times to handle brief consistency/latency)
+          const maxAttempts = 3;
+          let attempt = 0;
+          let productExists = false;
+          let lastProductCheckText = null;
+          const wait = (ms) => new Promise(r => setTimeout(r, ms));
+          while (attempt < maxAttempts && !productExists) {
+            attempt += 1;
+            try {
+              const productCheck = await fetch(API_ENDPOINTS.PRODUCT(newProductId));
+              lastProductCheckText = await productCheck.clone().text().catch(()=>null);
+              console.debug('[Inventory] product existence check', { attempt, productId: newProductId, status: productCheck.status, body: lastProductCheckText });
+              if (productCheck.ok) { productExists = true; break; }
+            } catch (pcErr) {
+              console.debug('[Inventory] product existence check network error', { attempt, productId: newProductId, error: pcErr });
             }
-          } catch (pcErr) {
-            throw new Error(`Product existence check failed before image sync: ${pcErr?.message || pcErr}`);
+            // small backoff
+            await wait(150 * attempt);
           }
+          if (!productExists) {
+            throw new Error(`Product existence check failed before image sync after ${attempt} attempts: ${lastProductCheckText || 'no response'}`);
+          }
+
           // Fetch existing images for this product
           const existingRes = await fetch(API_ENDPOINTS.PRODUCT_IMAGES_BY_PRODUCT(newProductId));
+          const existingResText = await existingRes.clone().text().catch(()=>null);
+          console.debug('[Inventory] fetch existing images', { productId: newProductId, status: existingRes.status, body: existingResText });
           if (!existingRes.ok) {
-            const existingErr = await existingRes.text();
-            throw new Error(`Failed to fetch existing images: ${existingRes.status} ${existingRes.statusText} - ${existingErr}`);
+            const existingErr = existingResText || `${existingRes.status} ${existingRes.statusText}`;
+            throw new Error(`Failed to fetch existing images: ${existingErr}`);
           }
           const existing = await existingRes.json();
 
@@ -731,9 +750,11 @@ const InventoryList = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(imagePayload)
               });
+              const createResText = await createRes.clone().text().catch(()=>null);
+              console.debug('[Inventory] create product image', { productId: newProductId, url, status: createRes.status, body: createResText });
               if (!createRes.ok) {
-                const createErr = await createRes.text();
-                throw new Error(`Failed to save image "${url}": ${createRes.status} ${createRes.statusText} - ${createErr}`);
+                const createErr = createResText || `${createRes.status} ${createRes.statusText}`;
+                throw new Error(`Failed to save image "${url}": ${createErr}`);
               }
             }
           }
