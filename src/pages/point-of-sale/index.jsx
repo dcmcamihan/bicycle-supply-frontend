@@ -369,11 +369,22 @@ const PointOfSale = () => {
 
       // 2. POST Sale Details
       try {
+        // Compute subtotal and distribute cart-level discount proportionally to line items
+        const subtotalLocal = cartItems?.reduce((sum, it) => sum + (it.price * it.quantity), 0) || 0;
+        const discountValueLocal = Math.min(Math.max(parseFloat(discountAmount) || 0, 0), subtotalLocal);
+
         for (const item of cartItems) {
+          const lineTotal = (item.price * item.quantity) || 0;
+          // Proportional share of discount for this line (avoid division by zero)
+          const proportion = subtotalLocal > 0 ? (lineTotal / subtotalLocal) : 0;
+          const lineDiscount = Math.round((discountValueLocal * proportion) * 100) / 100; // 2 decimals
+
           const saleDetailPayload = {
             sale_id: saleId,
             product_id: item.id,
-            quantity_sold: item.quantity
+            quantity_sold: item.quantity,
+            unit_price: item.price,
+            discount_amount: lineDiscount
           };
           console.log('POST /api/sale-details payload:', saleDetailPayload);
           const saleDetailsRes = await fetch(API_ENDPOINTS.SALE_DETAILS_BASE, {
