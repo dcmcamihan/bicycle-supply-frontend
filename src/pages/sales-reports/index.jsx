@@ -69,16 +69,31 @@ const SalesReports = () => {
     return await res.json();
   };
 
-  // Helper: fetch sale details and compute total amount
+  // Helper: fetch sale details and compute total amount using persisted unit_price and discount_amount
   const getSaleDetailsAndAmount = async (saleId) => {
     const details = await fetchJson(API_ENDPOINTS.SALE_DETAILS(saleId));
     let totalAmount = 0;
     let itemsCount = 0;
     for (const detail of details) {
-      const prod = await fetchJson(API_ENDPOINTS.PRODUCT(detail.product_id));
-      const price = parseFloat(prod.price) || 0;
-      totalAmount += price * (detail.quantity_sold || 0);
-      itemsCount += detail.quantity_sold || 0;
+      // Use unit_price from sale detail when available; otherwise fall back to product price
+      let unitPrice = null;
+      if (detail.unit_price !== undefined && detail.unit_price !== null) {
+        unitPrice = Number(detail.unit_price) || 0;
+      } else {
+        try {
+          const prod = await fetchJson(API_ENDPOINTS.PRODUCT(detail.product_id));
+          unitPrice = parseFloat(prod.price) || 0;
+        } catch (e) {
+          unitPrice = 0;
+        }
+      }
+
+      const qty = Number(detail.quantity_sold || 0);
+      // discount_amount is stored as the total discount applied to this line
+      const discount = Number(detail.discount_amount || 0);
+      const lineTotal = (unitPrice * qty) - discount;
+      totalAmount += lineTotal;
+      itemsCount += qty;
     }
     return { details, totalAmount, itemsCount };
   };
@@ -321,14 +336,18 @@ const SalesReports = () => {
           details.forEach(detail => {
             if (detail.product_id) {
               const prod = productCache.get(detail.product_id) || { product_name: String(detail.product_id), price: 0 };
-              const price = parseFloat(prod.price) || 0;
-              const line = price * (detail.quantity_sold || 0);
+              // Prefer unit_price stored on the sale detail, otherwise fall back to product price
+              const unitPrice = (detail.unit_price !== undefined && detail.unit_price !== null)
+                ? Number(detail.unit_price) || 0
+                : (parseFloat(prod.price) || 0);
+              const qty = Number(detail.quantity_sold || 0);
+              const line = (unitPrice * qty) - (Number(detail.discount_amount || 0));
               productCountMap.set(
                 detail.product_id,
-                (productCountMap.get(detail.product_id) || 0) + (detail.quantity_sold || 0)
+                (productCountMap.get(detail.product_id) || 0) + qty
               );
               const existing = productAgg.get(detail.product_id) || { name: prod.product_name, quantity: 0, sales: 0 };
-              existing.quantity += (detail.quantity_sold || 0);
+              existing.quantity += qty;
               existing.sales += line;
               productAgg.set(detail.product_id, existing);
             }

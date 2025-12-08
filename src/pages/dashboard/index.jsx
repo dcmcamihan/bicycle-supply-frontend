@@ -73,13 +73,17 @@ const Dashboard = () => {
             let sum = 0;
             try {
               const detRes = await fetch(API_ENDPOINTS.SALE_DETAILS(saleId));
-              if (detRes.ok) {
+                if (detRes.ok) {
                 const dets = await detRes.json();
                 sum = dets.reduce((acc, det) => {
                   const pid = Number(det.product_id);
                   const qty = Number(det.quantity_sold || det.quantity || 0);
-                  const price = priceMap.get(pid) || 0;
-                  return acc + (price * qty);
+                  // Prefer unit_price stored on sale detail, otherwise fall back to product price
+                  const unitPrice = (det.unit_price !== undefined && det.unit_price !== null)
+                    ? Number(det.unit_price) || 0
+                    : (priceMap.get(pid) || 0);
+                  const discount = Number(det.discount_amount || 0);
+                  return acc + (unitPrice * qty) - discount;
                 }, 0);
               }
             } catch {}

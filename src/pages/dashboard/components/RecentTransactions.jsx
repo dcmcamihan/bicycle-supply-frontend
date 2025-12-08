@@ -19,10 +19,24 @@ const RecentTransactions = () => {
     let totalAmount = 0;
     const itemNames = [];
     for (const d of details) {
-      const prod = await fetchJson(API_ENDPOINTS.PRODUCT(d.product_id));
-      const price = parseFloat(prod.price) || 0;
-      totalAmount += price * (d.quantity_sold || 0);
-      itemNames.push(prod.product_name);
+      // Prefer unit_price from sale detail; fallback to product price
+      let unitPrice = null;
+      if (d.unit_price !== undefined && d.unit_price !== null) {
+        unitPrice = Number(d.unit_price) || 0;
+      } else {
+        try {
+          const prod = await fetchJson(API_ENDPOINTS.PRODUCT(d.product_id));
+          unitPrice = parseFloat(prod.price) || 0;
+          itemNames.push(prod.product_name);
+        } catch (e) {
+          unitPrice = 0;
+        }
+      }
+      const qty = Number(d.quantity_sold || 0);
+      const discount = Number(d.discount_amount || 0);
+      totalAmount += (unitPrice * qty) - discount;
+      // If we didn't already add product name (when unit_price present, we still try to show something)
+      if (!itemNames.length && d.product_id) itemNames.push(String(d.product_id));
     }
     return { totalAmount, itemsLabel: itemNames.join(', ') };
   };

@@ -46,11 +46,15 @@ const TransactionTable = ({ transactions }) => {
       for (const d of details) {
         try {
           const p = await fetchJson(API_ENDPOINTS.PRODUCT(d.product_id));
-          const price = Number(p.price || 0);
           const qty = Number(d.quantity_sold || d.quantity || 0);
-          const total = price * qty;
+          // Prefer unit_price from sale detail; fallback to product price
+          const unitPrice = (d.unit_price !== undefined && d.unit_price !== null)
+            ? Number(d.unit_price) || 0
+            : Number(p.price || 0);
+          const discount = Number(d.discount_amount || 0);
+          const total = (unitPrice * qty) - discount;
           grandTotal += total;
-          items.push({ name: p.product_name, qty, price, total });
+          items.push({ name: p.product_name, qty, price: unitPrice, total });
         } catch {
           const qty = Number(d.quantity_sold || d.quantity || 0);
           items.push({ name: `Product #${d.product_id}`, qty, price: 0, total: 0 });
