@@ -42,7 +42,7 @@ const SalesHistoryModal = ({ isOpen, onClose, productId }) => {
 
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-1200 flex items-center justify-center">
+    <div className="fixed inset-0 z-1400 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose}></div>
       <div className="relative bg-card border border-border rounded-xl p-6 w-full max-w-2xl">
         <div className="flex items-start justify-between mb-3">

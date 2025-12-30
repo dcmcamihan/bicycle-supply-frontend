@@ -130,7 +130,7 @@ const CreatePurchaseOrderModal = ({ isOpen, onClose, productId, supplierId: supp
 
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-1200 flex items-center justify-center">
+    <div className="fixed inset-0 z-1400 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose}></div>
       <div className="relative bg-card border border-border rounded-xl p-6 w-full max-w-lg max-h-[85vh] overflow-y-auto">
         <h3 className="text-lg font-heading font-semibold mb-2">Create Purchase Order</h3>

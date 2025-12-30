@@ -547,9 +547,10 @@ const ProductDetails = () => {
                     </div>
                     <ProductActions
                       product={product}
-                      onEdit={handleEditProduct}
-                      onDelete={handleDeleteProduct}
-                      onAddToCart={handleAddToCart}
+                      onEdit={() => { handleEditProduct(); setShowMobileActions(false); }}
+                      onDelete={(p) => { handleDeleteProduct(p); setShowMobileActions(false); }}
+                      onAddToCart={(p) => { handleAddToCart(p); setShowMobileActions(false); }}
+                      onAdjustStock={() => { openAdjustStock(); setShowMobileActions(false); }}
                     />
                   </div>
                 </div>
