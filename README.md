@@ -1,177 +1,65 @@
-# React
+# Jolen's Bicycle Supply: Frontend
 
-A modern React-based project utilizing the latest frontend technologies and tools for building responsive web applications.
+A point-of-sale (POS) and inventory management system for Jolen's Bicycle Supply, a bicycle shop in Digos City, Philippines. It replaces the shop's paper logs and spreadsheets with one web app for sales, stock tracking and reports.
 
-## 🚀 Features
+**Live site:** https://bicycle-supply-frontend.onrender.com
+**Backend:** [bicycle-supply-backend](https://github.com/dcmcamihan/bicycle-supply-backend) (Node.js, Express, MySQL)
 
-- **React 18** - React version with improved rendering and concurrent features
-- **Vite** - Lightning-fast build tool and development server
-- **Redux Toolkit** - State management with simplified Redux setup
-- **TailwindCSS** - Utility-first CSS framework with extensive customization
-- **React Router v6** - Declarative routing for React applications
-- **Data Visualization** - Integrated D3.js and Recharts for powerful data visualization
-- **Form Management** - React Hook Form for efficient form handling
-- **Animation** - Framer Motion for smooth UI animations
-- **Testing** - Jest and React Testing Library setup
+## Features
 
-## 📋 Prerequisites
+- **Dashboard:** today's sales, total inventory, low-stock alerts, pending orders and a sales chart by day, week or month
+- **Point of sale:** product search and category filters, a cart, customer lookup, and cash, card, bank transfer and e-wallet payments
+- **Inventory:** add, edit, archive and adjust stock, with a product details page and image gallery
+- **Orders and returns:** pending orders and return processing
+- **Sales reports:** KPIs, best sellers, category and payment breakdowns, peak hours and staff performance, exportable to PDF and Excel
+- **Management:** employees, suppliers, brands, categories and attendance, with manager-only routes
+- **Accounts:** login, sign-up, password reset, profile and preferences
 
-- Node.js (v14.x or higher)
-- npm or yarn
+## Tech stack
 
-## 🛠️ Installation
+- React 18 with React Router v6
+- Vite
+- Tailwind CSS
+- Axios for API calls, with all endpoints in `src/config/api.js`
+- Recharts and D3 for charts
+- jsPDF and ExcelJS for report exports
+- Framer Motion for animations
+
+## Getting started
+
+Requires Node.js 18 or later and a running instance of the backend.
 
 1. Install dependencies:
-   ```bash
+   ```sh
    npm install
-   # or
-   yarn install
    ```
-   
-2. Start the development server:
-   ```bash
+2. Create a `.env` file in the project root that points to the backend API:
+   ```sh
+   VITE_API_BASE_URL=http://localhost:3000/api
+   ```
+3. Start the development server:
+   ```sh
    npm start
-   # or
-   yarn start
    ```
+   The app runs at http://localhost:4028.
 
-## 📁 Project Structure
+| Command | What it does |
+| --- | --- |
+| `npm start` | Starts the Vite development server |
+| `npm run build` | Builds the app into `build/` |
+| `npm run serve` | Previews the production build |
+
+To run the app with Docker instead, see [README_DOCKER.md](README_DOCKER.md).
+
+## Project structure
 
 ```
-bikeshop_pro/
-├── public/                        # Static assets
-│   ├── favicon.ico
-│   ├── manifest.json
-│   ├── robots.txt
-│   └── assets/
-│       └── images/
-│           └── no_image.png
-├── src/                           # Source code
-│   ├── App.jsx                    # Main application component
-│   ├── index.jsx                  # Application entry point
-│   ├── Routes.jsx                 # Application routes
-│   ├── components/                # Shared/reusable UI components
-│   │   ├── AppIcon.jsx
-│   │   ├── AppImage.jsx
-│   │   ├── ErrorBoundary.jsx
-│   │   ├── ScrollToTop.jsx
-│   │   └── ui/                    # UI primitives
-│   │       ├── Breadcrumb.jsx
-│   │       ├── Button.jsx
-│   │       ├── Checkbox.jsx
-│   │       ├── Header.jsx
-│   │       ├── Input.jsx
-│   │       ├── Select.jsx
-│   │       ├── Sidebar.jsx
-│   │       └── UserMenu.jsx
-│   ├── pages/                     # Top-level pages and features
-│   │   ├── NotFound.jsx
-│   │   ├── dashboard/
-│   │   │   ├── index.jsx
-│   │   │   └── components/
-│   │   │       ├── ActivityFeed.jsx
-│   │   │       ├── LowStockAlert.jsx
-│   │   │       ├── MetricsCard.jsx
-│   │   │       ├── QuickActions.jsx
-│   │   │       ├── RecentTransactions.jsx
-│   │   │       └── SalesChart.jsx
-│   │   ├── inventory-management/
-│   │   │   ├── index.jsx
-│   │   │   └── components/
-│   │   │       ├── BulkActionsToolbar.jsx
-│   │   │       ├── InventoryFilters.jsx
-│   │   │       ├── InventorySidebar.jsx
-│   │   │       ├── InventoryTable.jsx
-│   │   │       ├── MobileInventoryCard.jsx
-│   │   │       └── ProductModal.jsx
-│   │   ├── login/
-│   │   │   ├── index.jsx
-│   │   │   └── components/
-│   │   │       ├── LoginBackground.jsx
-│   │   │       ├── LoginForm.jsx
-│   │   │       ├── LoginHeader.jsx
-│   │   │       └── SecurityBadges.jsx
-│   │   ├── point-of-sale/
-│   │   │   ├── index.jsx
-│   │   │   └── components/
-│   │   │       ├── CategoryFilter.jsx
-│   │   │       ├── CustomerLookup.jsx
-│   │   │       ├── PaymentMethods.jsx
-│   │   │       ├── ProductGrid.jsx
-│   │   │       ├── ProductSearch.jsx
-│   │   │       └── ShoppingCart.jsx
-│   │   ├── product-details/
-│   │   │   ├── index.jsx
-│   │   │   └── components/
-│   │   │       ├── ProductActions.jsx
-│   │   │       ├── ProductHeader.jsx
-│   │   │       ├── ProductImageGallery.jsx
-│   │   │       └── ProductInfoTabs.jsx
-│   │   ├── sales-reports/
-│   │   │   ├── index.jsx
-│   │   │   └── components/
-│   │   │       ├── CategoryChart.jsx
-│   │   │       ├── InsightsPanel.jsx
-│   │   │       ├── KPICards.jsx
-│   │   │       ├── ReportHeader.jsx
-│   │   │       ├── SalesChart.jsx
-│   │   │       └── TransactionTable.jsx
-│   │   ├── settings/
-│   │   │   ├── Preferences.jsx
-│   │   │   └── ProfileSettings.jsx
-│   │   └── support/
-│   │       └── HelpSupport.jsx
-│   ├── styles/                    # Global styles and Tailwind configuration
-│   │   ├── index.css
-│   │   └── tailwind.css
-│   └── utils/                     # Utility functions
-│       └── cn.js
-├── .env                           # Environment variables
-├── index.html                     # HTML template
-├── package.json                   # Project dependencies and scripts
-├── tailwind.config.js             # Tailwind CSS configuration
-└── vite.config.js                 # Vite configuration
-```
-
-## 🧩 Adding Routes
-
-To add new routes to the application, update the `Routes.jsx` file:
-
-```jsx
-import { useRoutes } from "react-router-dom";
-import HomePage from "pages/HomePage";
-import AboutPage from "pages/AboutPage";
-
-const ProjectRoutes = () => {
-  let element = useRoutes([
-    { path: "/", element: <HomePage /> },
-    { path: "/about", element: <AboutPage /> },
-    // Add more routes as needed
-  ]);
-
-  return element;
-};
-```
-
-## 🎨 Styling
-
-This project uses Tailwind CSS for styling. The configuration includes:
-
-- Forms plugin for form styling
-- Typography plugin for text styling
-- Aspect ratio plugin for responsive elements
-- Container queries for component-specific responsive design
-- Fluid typography for responsive text
-- Animation utilities
-
-## 📱 Responsive Design
-
-The app is built with responsive design using Tailwind CSS breakpoints.
-
-## 📦 Deployment
-
-Build the application for production:
-
-```bash
-npm run build
+src/
+├── components/   Shared UI (buttons, inputs, header, sidebar, toasts)
+├── config/       API endpoint definitions
+├── contexts/     AuthContext for login state and protected routes
+├── pages/        One folder per screen (dashboard, point-of-sale, inventory, sales reports, ...)
+├── styles/       Global styles and Tailwind setup
+├── utils/        Helpers for the cart, report exports and class names
+└── Routes.jsx    App routes
 ```
